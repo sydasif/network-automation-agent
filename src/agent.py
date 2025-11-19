@@ -120,9 +120,12 @@ When users ask about network devices:
 
 Common commands:
 - show version (device info)
-- show interfaces (interface status)
+- show interfaces status (interface status)
 - show ip route (routing table)
 - show running-config (current config)
+- show ip interface brief (quick interface/IP overview)
+- show mac address-table (MAC addresses)
+- show cdp neighbors (connected devices)
 
 If no specific device is mentioned, assume they mean ALL devices: {device_names}
 """
