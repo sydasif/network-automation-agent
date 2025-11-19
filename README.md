@@ -21,24 +21,29 @@ A sophisticated network automation tool that combines AI with network device man
 ## Setup
 
 1. **Clone and Initialize**:
+
    ```bash
    git clone <repository-url>
    cd network-agent
    ```
 
 2. **Install Dependencies**:
+
    ```bash
    uv sync
    ```
 
 3. **Configure Environment**:
+
    ```bash
    cp .env.example .env
    ```
+
    Add your Groq API key to the `.env` file.
 
 4. **Configure Devices**:
    Edit `config/hosts.yaml` to add your network devices:
+
    ```yaml
    devices:
      - name: router-1
@@ -56,11 +61,13 @@ A sophisticated network automation tool that combines AI with network device man
 ## Usage
 
 Run the agent:
+
 ```bash
 uv run src/agent.py
 ```
 
 The agent will start in interactive mode. You can enter commands like:
+
 - "Show me the version of router-1"
 - "Show interfaces on switch-1"
 - "Show version on all devices"
@@ -79,8 +86,9 @@ The agent follows a LangGraph-based state machine approach with three main nodes
 ## Supported Commands
 
 The agent can execute any command supported by your network devices, with special formatting for:
+
 - `show version`
-- `show interfaces` 
+- `show interfaces`
 - `show ip route`
 - `show running-config`
 - `show startup-config`

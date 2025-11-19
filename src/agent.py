@@ -1,5 +1,5 @@
+import json
 import os
-import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, TypedDict, Union
 
@@ -37,7 +37,7 @@ def run_command(device: str | list[str], command: str) -> str:
         command: The CLI command to execute (e.g., 'show version', 'show interfaces')
 
     Returns:
-        Formatted string with command output from each device
+        JSON formatted string with command output from each device
     """
     all_devices = load_devices()
 
@@ -50,7 +50,10 @@ def run_command(device: str | list[str], command: str) -> str:
     # Check if all devices exist in config
     for dev in device_list:
         if dev not in all_devices:
-            return f"Error: Device '{dev}' not found. Available devices: {', '.join(all_devices.keys())}"
+            return json.dumps({
+                "error": f"Device '{dev}' not found",
+                "available_devices": list(all_devices.keys()),
+            })
 
     results = {}
 
@@ -65,12 +68,32 @@ def run_command(device: str | list[str], command: str) -> str:
                 timeout=30,
             )
 
-            output = connection.send_command(command)
+            # Try structured parsing first with TextFSM
+            try:
+                output = connection.send_command(command, use_textfsm=True)
+
+                # Check if TextFSM parsing worked (returns list/dict) or failed (returns string)
+                if isinstance(output, str):
+                    # Parsing failed, return raw text
+                    parsed_type = "raw"
+                    parsed_output = output
+                else:
+                    # Parsing succeeded
+                    parsed_type = "structured"
+                    parsed_output = output
+
+            except Exception as parse_error:
+                # TextFSM parsing error, fallback to raw
+                output = connection.send_command(command)
+                parsed_type = "raw"
+                parsed_output = output
+
             connection.disconnect()
 
-            return dev, output
+            return dev, {"success": True, "type": parsed_type, "data": parsed_output}
+
         except Exception as e:
-            return dev, f"Error: {str(e)}"
+            return dev, {"success": False, "error": str(e)}
 
     # Run commands in parallel
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -80,19 +103,13 @@ def run_command(device: str | list[str], command: str) -> str:
             dev, output = future.result()
             results[dev] = output
 
-    # Format results
-    result_str = ""
-    for dev, output in results.items():
-        result_str += f"=== {dev} ===\n{output}\n\n"
-
-    return result_str
+    # Return as JSON for LLM to parse
+    return json.dumps({"command": command, "devices": results}, indent=2)
 
 
 # Initialize the LLM
 llm = ChatGroq(
-    temperature=0,
-    model_name="llama-3.3-70b-versatile",
-    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0, model_name="openai/gpt-oss-20b", api_key=os.getenv("GROQ_API_KEY")
 )
 
 # Bind the tool to the LLM
@@ -120,12 +137,19 @@ When users ask about network devices:
 
 Common commands:
 - show version (device info)
-- show interfaces status (interface status)
 - show ip route (routing table)
 - show running-config (current config)
+- show interfaces status (interface status)
+- show interfaces (detailed interface info)
 - show ip interface brief (quick interface/IP overview)
 - show mac address-table (MAC addresses)
 - show cdp neighbors (connected devices)
+- show vlan brief (VLAN info)
+- show logging (logs)
+
+
+The run_command tool returns JSON data. When data is "structured", it's been parsed by TextFSM into clean JSON.
+When it's "raw", you'll need to parse the text yourself.
 
 If no specific device is mentioned, assume they mean ALL devices: {device_names}
 """
@@ -195,14 +219,20 @@ def respond_node(state: State) -> State:
         return state
 
     # Otherwise, ask LLM to synthesize tool results into a response
-    response = llm.invoke(
-        messages
-        + [
-            SystemMessage(
-                content="Summarize the command results for the user in a clear, helpful way."
-            )
-        ]
+    synthesis_prompt = SystemMessage(
+        content="""Analyze the command results and provide a clear, helpful summary.
+
+If the data is structured (type: "structured"), format it as tables when appropriate using markdown.
+If the data is raw text, extract and present the key information clearly.
+
+For interface data: show status, IP addresses, and any issues.
+For version data: show model, IOS version, and uptime.
+For routing data: summarize routes and highlight anything unusual.
+
+Be concise but thorough. Use tables, bullets, or paragraphs as appropriate."""
     )
+
+    response = llm.invoke(messages + [synthesis_prompt])
 
     return {"messages": messages + [response], "results": state.get("results", {})}
 
@@ -231,7 +261,7 @@ def main():
     """Main CLI loop"""
     app = create_graph()
 
-    print("🤖 Network AI Agent Ready!")
+    print("🤖 Network AI Agent Ready! (with TextFSM parsing)")
     print("Available devices:", ", ".join(load_devices().keys()))
     print("Type 'quit' to exit.\n")
 
@@ -271,6 +301,9 @@ def main():
             break
         except Exception as e:
             print(f"❌ Error: {str(e)}\n")
+            import traceback
+
+            traceback.print_exc()
 
 
 if __name__ == "__main__":
