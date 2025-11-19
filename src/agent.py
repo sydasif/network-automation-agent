@@ -1,32 +1,44 @@
 import os
-import yaml
-from dotenv import load_dotenv
-from netmiko import ConnectHandler
-from langchain_groq import ChatGroq
-from langchain_core.tools import tool
-from langgraph.graph import StateGraph
-from langgraph.graph.message import add_messages
-from typing import Dict, List, TypedDict, Annotated, Union
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, TypedDict, Union
+
+import yaml
+from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.tools import tool
+from langchain_groq import ChatGroq
+from langgraph.graph import END, StateGraph
+from netmiko import ConnectHandler
 from tabulate import tabulate
 
 # Load environment variables
 load_dotenv()
 
+
 class State(TypedDict):
-    messages: List
-    results: Dict
+    messages: list
+    results: dict
+
 
 def load_devices():
     """Load device configurations from hosts.yaml"""
-    with open('config/hosts.yaml', 'r') as file:
+    with open('config/hosts.yaml') as file:
         config = yaml.safe_load(file)
     return {device['name']: device for device in config['devices']}
 
+
 @tool
-def run_command(device: Union[str, List[str]], command: str) -> str:
-    """Execute network command and return output from one or multiple devices"""
+def run_command(device: str | list[str], command: str) -> str:
+    """Execute network command and return output from one or multiple devices.
+
+    Args:
+        device: Single device name (str) or list of device names
+        command: The CLI command to execute (e.g., 'show version', 'show interfaces')
+
+    Returns:
+        Formatted string with command output from each device
+    """
     all_devices = load_devices()
 
     # Convert single device to list for consistent processing
@@ -38,9 +50,8 @@ def run_command(device: Union[str, List[str]], command: str) -> str:
     # Check if all devices exist in config
     for dev in device_list:
         if dev not in all_devices:
-            return f"Error: Device '{dev}' not found in configuration."
+            return f"Error: Device '{dev}' not found. Available devices: {', '.join(all_devices.keys())}"
 
-    # Execute commands in parallel using ThreadPoolExecutor
     results = {}
 
     def execute_on_device(dev):
@@ -50,7 +61,8 @@ def run_command(device: Union[str, List[str]], command: str) -> str:
                 device_type=dev_config['device_type'],
                 host=dev_config['host'],
                 username=dev_config['username'],
-                password=dev_config['password']
+                password=dev_config['password'],
+                timeout=30,
             )
 
             output = connection.send_command(command)
@@ -58,7 +70,7 @@ def run_command(device: Union[str, List[str]], command: str) -> str:
 
             return dev, output
         except Exception as e:
-            return dev, f"Error executing command on {dev}: {str(e)}"
+            return dev, f"Error: {str(e)}"
 
     # Run commands in parallel
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -68,178 +80,132 @@ def run_command(device: Union[str, List[str]], command: str) -> str:
             dev, output = future.result()
             results[dev] = output
 
-    # Format results as a string
+    # Format results
     result_str = ""
     for dev, output in results.items():
-        result_str += f"=== Output from {dev} ===\n"
-        result_str += f"{output}\n\n"
+        result_str += f"=== {dev} ===\n{output}\n\n"
 
     return result_str
+
 
 # Initialize the LLM
 llm = ChatGroq(
     temperature=0,
-    model_name="llama3-70b-8192",
-    api_key=os.getenv("GROQ_API_KEY")
+    model_name="llama-3.3-70b-versatile",
+    api_key=os.getenv("GROQ_API_KEY"),
 )
 
-def understand_node(state):
-    """Parse user intent to extract device(s) and command"""
+# Bind the tool to the LLM
+llm_with_tools = llm.bind_tools([run_command])
+
+
+def understand_node(state: State) -> State:
+    """Use LLM to understand user intent and decide what to do"""
     messages = state.get("messages", [])
-    last_message = messages[-1] if messages else ""
 
-    # Simple parsing to extract device and command
-    # In a real implementation, you'd use more sophisticated NLP
-    if isinstance(last_message, dict) and "content" in last_message:
-        content = last_message["content"]
-    elif isinstance(last_message, str):
-        content = last_message
-    else:
-        content = str(last_message)
-
-    # Look for all device names in the message
+    # Get available devices
     devices = load_devices()
-    found_devices = []
-    for device_name in devices.keys():
-        # Use word boundary to avoid partial matches (e.g. "router" matching "router-1" but not "subrouter-1")
-        if re.search(rf'\b{re.escape(device_name)}\b', content, re.IGNORECASE):
-            found_devices.append(device_name)
+    device_names = list(devices.keys())
 
-    # If no specific device mentioned, default to all devices
-    if not found_devices:
-        found_devices = list(devices.keys())
+    # Create system message with context
+    system_msg = SystemMessage(
+        content=f"""You are a network automation assistant. You help users interact with network devices.
 
-    # Define common commands for extraction
-    command_patterns = [
-        (r"show version", "show version"),
-        (r"show interfaces", "show interfaces"),
-        (r"show ip route", "show ip route"),
-        (r"show running-config", "show running-config"),
-        (r"show startup-config", "show startup-config")
+Available devices: {', '.join(device_names)}
+
+When users ask about network devices:
+1. If they want information (show commands), use the run_command tool
+2. If they ask about which devices are available, just tell them
+3. If they're just chatting (hi, hello, thanks), respond naturally WITHOUT using tools
+
+Common commands:
+- show version (device info)
+- show interfaces (interface status)
+- show ip route (routing table)
+- show running-config (current config)
+
+If no specific device is mentioned, assume they mean ALL devices: {device_names}
+"""
+    )
+
+    # Add system message and convert user messages
+    full_messages = [system_msg]
+    for msg in messages:
+        if isinstance(msg, str):
+            full_messages.append(HumanMessage(content=msg))
+        else:
+            full_messages.append(msg)
+
+    # Get LLM response
+    response = llm_with_tools.invoke(full_messages)
+
+    # Store the response
+    new_messages = messages + [response]
+
+    return {"messages": new_messages, "results": state.get("results", {})}
+
+
+def should_execute_tools(state: State) -> str:
+    """Router: Check if we need to execute tools or respond directly"""
+    last_message = state["messages"][-1]
+
+    # If LLM wants to use tools, go to execute node
+    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        return "execute"
+    return "respond"
+
+
+def execute_node(state: State) -> State:
+    """Execute the tools that the LLM requested"""
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    # Execute each tool call
+    tool_results = []
+    if hasattr(last_message, 'tool_calls'):
+        for tool_call in last_message.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+
+            if tool_name == "run_command":
+                result = run_command.invoke(tool_args)
+                tool_results.append({"tool_call_id": tool_call["id"], "output": result})
+
+    # Create tool messages
+    from langchain_core.messages import ToolMessage
+
+    tool_messages = [
+        ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
+        for tr in tool_results
     ]
 
-    found_command = None
-    for pattern, command in command_patterns:
-        if re.search(pattern, content, re.IGNORECASE):
-            found_command = command
-            break
+    return {"messages": messages + tool_messages, "results": state.get("results", {})}
 
-    # If no command found, default to show version
-    if not found_command:
-        found_command = "show version"
 
-    # Store extracted intent in state
-    parsed_intent = {
-        "device": found_devices if len(found_devices) > 1 else found_devices[0] if found_devices else None,
-        "command": found_command
-    }
+def respond_node(state: State) -> State:
+    """Have LLM create final response to user"""
+    messages = state["messages"]
 
-    device_str = ", ".join(found_devices) if isinstance(parsed_intent["device"], list) else parsed_intent["device"] or "unknown"
-    return {
-        "messages": [f"Understood: Run '{found_command}' on '{device_str}'"],
-        "results": {"parsed_intent": parsed_intent}
-    }
+    # If the last message is from the LLM (no tool calls), use it directly
+    last_message = messages[-1]
+    if isinstance(last_message, AIMessage) and not hasattr(last_message, 'tool_calls'):
+        return state
 
-def execute_node(state):
-    """Execute the command on the device"""
-    results = state.get("results", {})
-    parsed_intent = results.get("parsed_intent", {})
+    # Otherwise, ask LLM to synthesize tool results into a response
+    response = llm.invoke(
+        messages
+        + [
+            SystemMessage(
+                content="Summarize the command results for the user in a clear, helpful way."
+            )
+        ]
+    )
 
-    device = parsed_intent.get("device")
-    command = parsed_intent.get("command")
+    return {"messages": messages + [response], "results": state.get("results", {})}
 
-    if not device or not command:
-        return {
-            "messages": ["Could not parse device or command from request"],
-            "results": {"error": "Missing device or command"}
-        }
 
-    # Execute the command
-    command_result = run_command.invoke({"device": device, "command": command})
-
-    return {
-        "messages": [f"Executed command on {device}"],
-        "results": {**results, "command_result": command_result}
-    }
-
-def parse_show_interfaces(output):
-    """Parse 'show interfaces' output into structured format for tabulation"""
-    lines = output.strip().split('\n')
-    interfaces = []
-    current_interface = {}
-
-    for line in lines:
-        # Look for interface name line (starts with interface name and has status)
-        if re.match(r'^\w+(?:\d+/\d+(?:\.\d+)?)?(?:\s+is\s+.*)?$', line.strip()) and 'is' in line:
-            # Save previous interface if exists
-            if current_interface:
-                interfaces.append(current_interface)
-
-            # Extract interface name and status
-            parts = line.split()
-            if len(parts) >= 3:
-                current_interface = {
-                    'Interface': parts[0],
-                    'Status': parts[1] if len(parts) > 1 else 'N/A',
-                    'Protocol': parts[2] if len(parts) > 2 else 'N/A'
-                }
-        elif 'address' in line.lower() and current_interface:
-            # Extract IP address if present
-            ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+/\d+)', line)
-            if ip_match:
-                current_interface['IP Address'] = ip_match.group(1)
-
-    # Add the last interface
-    if current_interface:
-        interfaces.append(current_interface)
-
-    return interfaces
-
-def respond_node(state):
-    """Format and return results to user"""
-    results = state.get("results", {})
-    command_result = results.get("command_result", "No result found")
-
-    # Check if this is a 'show interfaces' command for special formatting
-    parsed_intent = results.get("parsed_intent", {})
-    command = parsed_intent.get("command", "")
-
-    if "show interfaces" in command.lower():
-        # Parse the interfaces output
-        # Split the result by device sections
-        device_outputs = re.split(r'=+\s+Output from ', command_result)
-
-        formatted_result = ""
-        for device_output in device_outputs:
-            if not device_output.strip():
-                continue
-
-            # Separate device name from output
-            if '\n' in device_output:
-                device_part, output_part = device_output.split('\n', 1)
-                interfaces = parse_show_interfaces(output_part)
-
-                if interfaces:
-                    formatted_result += f"\n=== Interface Status for {device_part.strip(' =')} ===\n"
-                    formatted_result += tabulate(interfaces, headers="keys", tablefmt="grid")
-                    formatted_result += "\n"
-                else:
-                    formatted_result += f"\n=== Output from {device_part.strip(' =')} ===\n{output_part}\n"
-            else:
-                formatted_result += f"\n{device_output}\n"
-
-        response = f"Command execution result:\n{formatted_result}"
-    else:
-        # For other commands, return the original result
-        response = f"Command execution result:\n{command_result}"
-
-    return {
-        "messages": [response]
-    }
-
-def main():
-    """Main function to create and run the LangGraph with CLI loop"""
-    # Create the state graph
+def create_graph():
+    """Create and compile the LangGraph"""
     workflow = StateGraph(State)
 
     # Add nodes
@@ -248,40 +214,61 @@ def main():
     workflow.add_node("respond", respond_node)
 
     # Define edges
-    workflow.add_edge("understand", "execute")
-    workflow.add_edge("execute", "respond")
-
-    # Set entry point and end point
     workflow.set_entry_point("understand")
+    workflow.add_conditional_edges(
+        "understand", should_execute_tools, {"execute": "execute", "respond": END}
+    )
+    workflow.add_edge("execute", "respond")
+    workflow.add_edge("respond", END)
 
-    # Compile the graph
-    app = workflow.compile()
+    return workflow.compile()
 
-    print("Network AI Agent ready! Type 'quit' to exit.")
+
+def main():
+    """Main CLI loop"""
+    app = create_graph()
+
+    print("🤖 Network AI Agent Ready!")
+    print("Available devices:", ", ".join(load_devices().keys()))
+    print("Type 'quit' to exit.\n")
+
+    conversation_history = []
 
     while True:
         try:
-            user_input = input("\nEnter your command: ").strip()
+            user_input = input("You: ").strip()
 
             if user_input.lower() in ['quit', 'exit', 'q']:
-                print("Goodbye!")
+                print("👋 Goodbye!")
                 break
 
             if not user_input:
                 continue
 
-            # Process the user input through the graph
-            final_state = app.invoke({"messages": [user_input], "results": {}})
+            # Add user message to history
+            conversation_history.append(user_input)
 
-            print("\nResponse:")
-            for msg in final_state["messages"]:
-                print(f"- {msg}")
+            # Run the graph
+            result = app.invoke({"messages": conversation_history, "results": {}})
+
+            # Get the final AI message
+            final_message = result["messages"][-1]
+            if isinstance(final_message, AIMessage):
+                response_text = final_message.content
+            else:
+                response_text = str(final_message)
+
+            print(f"\n🤖 Agent: {response_text}\n")
+
+            # Update conversation history with the full message chain
+            conversation_history = result["messages"]
 
         except KeyboardInterrupt:
-            print("\nGoodbye!")
+            print("\n👋 Goodbye!")
             break
         except Exception as e:
-            print(f"Error: {str(e)}")
+            print(f"❌ Error: {str(e)}\n")
+
 
 if __name__ == "__main__":
     main()
