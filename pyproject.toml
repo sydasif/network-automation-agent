@@ -1,7 +1,7 @@
 [project]
-name = "network-agent"
+name = "network-automation-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Network Automation Agent"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

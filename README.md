@@ -63,7 +63,7 @@ A sophisticated network automation tool that combines AI with network device man
 Run the agent:
 
 ```bash
-uv run src/agent.py
+uv run main.py
 ```
 
 The agent will start in interactive mode. You can enter commands like:
@@ -95,7 +95,7 @@ The agent can execute any command supported by your network devices, with specia
 
 ## Security
 
-- Device credentials are stored in `config/hosts.yaml`
+- Device credentials are stored in `hosts.yaml`
 - API keys are stored in `.env` and not committed to version control
 - SSH connections are established using the netmiko library with secure practices
 
@@ -103,9 +103,7 @@ The agent can execute any command supported by your network devices, with specia
 
 - Ensure your `.env` file contains a valid Groq API key
 - Verify network connectivity to configured devices
-- Check device credentials in `config/hosts.yaml`
+- Check device credentials in `hosts.yaml`
 - Confirm the device type matches your network equipment in the configuration
 
 ## License
-
-[Specify your license here]
