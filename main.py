@@ -1,9 +1,24 @@
+"""Main entry point for the Network AI Agent.
+
+This module provides the interactive CLI interface for the network automation agent,
+allowing users to communicate with network devices using natural language commands.
+"""
+
 from langchain_core.messages import AIMessage
 
 from graph.router import create_graph
 
 
 def main():
+    """Initialize and run the Network AI Agent in interactive mode.
+
+    The function creates a graph-based workflow for processing user input,
+    executing network commands, and returning formatted responses. It runs
+    in a continuous loop until the user types 'quit', 'exit', or 'q'.
+
+    The agent maintains conversation history and interacts with network
+    devices through the configured LangGraph workflow.
+    """
     app = create_graph()
 
     print("🤖 Network AI Agent Ready!")

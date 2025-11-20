@@ -42,7 +42,7 @@ A sophisticated network automation tool that combines AI with network device man
    Add your Groq API key to the `.env` file.
 
 4. **Configure Devices**:
-   Edit `config/hosts.yaml` to add your network devices:
+   Edit `hosts.yaml` to add your network devices:
 
    ```yaml
    devices:
@@ -82,6 +82,26 @@ The agent follows a LangGraph-based state machine approach with three main nodes
 1. **Understand**: Parses user intent to extract device names and commands
 2. **Execute**: Runs the network commands on the specified devices
 3. **Respond**: Formats and returns results to the user
+
+## API Documentation
+
+### Core Modules
+
+- `main.py`: Entry point with interactive CLI interface
+- `graph/router.py`: Workflow definition using LangGraph
+- `graph/nodes.py`: Implementation of the three main nodes
+- `llm/setup.py`: LLM client configuration and initialization
+- `tools/run_command.py`: Network command execution tool
+- `utils/devices.py`: Device configuration loading utilities
+
+### Key Functions
+
+- `create_graph()`: Creates the LangGraph workflow
+- `understand_node()`: Processes user input and determines if tools need to be executed
+- `execute_node()`: Executes network commands on specified devices
+- `respond_node()`: Formats and returns results to the user
+- `run_command()`: Executes commands on network devices via SSH
+- `load_devices()`: Loads device configurations from hosts.yaml
 
 ## Supported Commands
 

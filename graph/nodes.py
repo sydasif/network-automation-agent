@@ -1,3 +1,11 @@
+"""Defines the node functions for the network automation agent workflow.
+
+This module implements the three main nodes in the LangGraph workflow:
+- understand_node: Parses user input and determines if tools need to be executed
+- execute_node: Executes network commands on specified devices
+- respond_node: Formats and returns results to the user
+"""
+
 from typing import List
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -11,6 +19,18 @@ llm_with_tools = llm.bind_tools([run_command])
 
 
 def understand_node(state: dict) -> dict:
+    """Processes user input and determines if network commands need to be executed.
+
+    This node analyzes the conversation history and creates an appropriate
+    system message with available devices. It then uses the LLM to decide
+    whether to call tools (execute commands) or respond directly to the user.
+
+    Args:
+        state: The current state of the conversation containing messages and results
+
+    Returns:
+        Updated state with new messages and preserved results
+    """
     messages: list[str] = state.get("messages", [])
 
     devices = load_devices()
@@ -37,6 +57,17 @@ def understand_node(state: dict) -> dict:
 
 
 def should_execute_tools(state: dict) -> str:
+    """Determines if the workflow should execute tools or respond directly.
+
+    This function checks if the last message in the state contains tool calls
+    that need to be executed.
+
+    Args:
+        state: The current state of the conversation
+
+    Returns:
+        String indicating the next step: "execute" if tools need to run, "respond" otherwise
+    """
     last = state["messages"][-1]
     if hasattr(last, "tool_calls") and last.tool_calls:
         return "execute"
@@ -44,6 +75,18 @@ def should_execute_tools(state: dict) -> str:
 
 
 def execute_node(state: dict) -> dict:
+    """Executes network commands on specified devices based on tool calls.
+
+    This node processes tool calls from the LLM, specifically the run_command tool,
+    and executes the requested commands on the specified devices. It handles
+    the parallel execution of commands and formats the results as tool messages.
+
+    Args:
+        state: The current state containing messages with tool calls
+
+    Returns:
+        Updated state with tool response messages and preserved results
+    """
     messages = state["messages"]
     last = messages[-1]
 
@@ -57,6 +100,7 @@ def execute_node(state: dict) -> dict:
                 result = run_command.invoke(tool_call["args"])
                 tool_results.append({"tool_call_id": tool_call["id"], "output": result})
 
+    # Create ToolMessage objects to pass results back to the LLM
     tool_messages = [
         ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
         for tr in tool_results
@@ -66,6 +110,18 @@ def execute_node(state: dict) -> dict:
 
 
 def respond_node(state: dict) -> dict:
+    """Formats and returns the final response to the user.
+
+    This node synthesizes the results from command execution or provides
+    a direct response if no tools were needed. It creates a system message
+    that guides the LLM to format the output appropriately.
+
+    Args:
+        state: The current state containing messages and results
+
+    Returns:
+        Updated state with the final response message and preserved results
+    """
     messages = state["messages"]
     last = messages[-1]
 
