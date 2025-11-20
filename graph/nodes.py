@@ -6,9 +6,9 @@ This module implements the three main nodes in the LangGraph workflow:
 - respond_node: Formats and returns results to the user
 """
 
-from typing import List
+from typing import List, Any, TypedDict
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage, ToolMessage
 
 from llm.setup import create_llm
 from tools.run_command import run_command
@@ -28,7 +28,7 @@ def clear_device_cache():
     _CACHED_DEVICE_NAMES = None
 
 
-def understand_node(state: dict) -> dict:
+def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """Processes user input and determines if network commands need to be executed.
 
     This node analyzes the conversation history and creates an appropriate
@@ -43,7 +43,7 @@ def understand_node(state: dict) -> dict:
     """
     global _CACHED_DEVICE_NAMES
 
-    messages: list[str] = state.get("messages", [])
+    messages: list[BaseMessage] = state.get("messages", [])
 
     # Use cached device names if available, otherwise load and cache them
     if _CACHED_DEVICE_NAMES is None:
@@ -70,7 +70,7 @@ def understand_node(state: dict) -> dict:
     return {"messages": messages + [response], "results": state.get("results", {})}
 
 
-def should_execute_tools(state: dict) -> str:
+def should_execute_tools(state: dict[str, Any]) -> str:
     """Determines if the workflow should execute tools or respond directly.
 
     This function checks if the last message in the state contains tool calls
@@ -88,7 +88,7 @@ def should_execute_tools(state: dict) -> str:
     return "respond"
 
 
-def execute_node(state: dict) -> dict:
+def execute_node(state: dict[str, Any]) -> dict[str, Any]:
     """Executes network commands on specified devices based on tool calls.
 
     This node processes tool calls from the LLM, specifically the run_command tool,
@@ -103,8 +103,6 @@ def execute_node(state: dict) -> dict:
     """
     messages = state["messages"]
     last = messages[-1]
-
-    from langchain_core.messages import ToolMessage
 
     tool_results = []
     if hasattr(last, "tool_calls"):
@@ -126,7 +124,7 @@ def execute_node(state: dict) -> dict:
     return {"messages": messages + tool_messages, "results": state.get("results", {})}
 
 
-def respond_node(state: dict) -> dict:
+def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     """Formats and returns the final response to the user.
 
     This node synthesizes the results from command execution or provides

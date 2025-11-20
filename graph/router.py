@@ -5,9 +5,10 @@ flow between understanding user requests, executing network commands, and
 responding to the user with formatted results.
 """
 
-from typing import TypedDict
+from typing import TypedDict, List, Any
 
 from langgraph.graph import END, StateGraph
+from langchain_core.messages import BaseMessage
 
 from graph.nodes import execute_node, respond_node, understand_node
 
@@ -19,8 +20,8 @@ class State(TypedDict):
         messages: List of conversation messages between user and agent
         results: Dictionary to store execution results and metadata
     """
-    messages: list
-    results: dict
+    messages: List[BaseMessage]
+    results: dict[str, Any]
 
 
 def create_graph():

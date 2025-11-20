@@ -7,12 +7,13 @@ with parallel processing capabilities.
 
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Union
+from typing import List, Union, Dict, Any
 
 from langchain_core.tools import tool
 from netmiko import ConnectHandler
+from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
 
-from utils.devices import load_devices
+from utils.devices import load_devices, DeviceConfig
 
 
 @tool
@@ -54,7 +55,7 @@ def run_command(device: str | list[str], command: str) -> str:
 
     results = {}
 
-    def execute_on_device(dev_name: str):
+    def execute_on_device(dev_name: str) -> tuple[str, Dict[str, Any]]:
         """Helper function to execute a command on a single device.
 
         Args:
@@ -63,7 +64,7 @@ def run_command(device: str | list[str], command: str) -> str:
         Returns:
             Tuple of device name and execution result
         """
-        cfg = all_devices[dev_name]
+        cfg: DeviceConfig = all_devices[dev_name]
         try:
             # Establish SSH connection to the device
             conn = ConnectHandler(
@@ -100,9 +101,15 @@ def run_command(device: str | list[str], command: str) -> str:
                 "data": parsed_output,
             }
 
+        except NetmikoAuthenticationException as e:
+            # Handle authentication-specific errors
+            return dev_name, {"success": False, "error": f"Authentication failed: {str(e)}"}
+        except NetmikoTimeoutException as e:
+            # Handle timeout-specific errors
+            return dev_name, {"success": False, "error": f"Connection timeout: {str(e)}"}
         except Exception as e:
             # Return error information if connection or command execution fails
-            return dev_name, {"success": False, "error": str(e)}
+            return dev_name, {"success": False, "error": f"Connection error: {str(e)}"}
 
     # Execute commands in parallel across multiple devices using ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=min(len(device_list), 10)) as ex:

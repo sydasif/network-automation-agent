@@ -4,9 +4,11 @@ This module provides the interactive CLI interface for the network automation ag
 allowing users to communicate with network devices using natural language commands.
 """
 
-from langchain_core.messages import AIMessage
+from typing import Any
 
-from graph.router import create_graph
+from langchain_core.messages import AIMessage, BaseMessage
+
+from graph.router import create_graph, State
 
 
 def main():
@@ -24,7 +26,7 @@ def main():
     print("🤖 Network AI Agent Ready!")
     print("Type 'quit' to exit.\n")
 
-    conversation_history = []
+    conversation_history: list[BaseMessage] = []
 
     while True:
         try:
@@ -48,7 +50,7 @@ def main():
 
             print(f"\n🤖 Agent: {response_text}\n")
 
-            conversation_history = result["messages"]
+            conversation_history = result["messages"]  # type: ignore
 
         except KeyboardInterrupt:
             print("\nGoodbye!")

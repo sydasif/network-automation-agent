@@ -6,19 +6,29 @@ devices with different connection parameters.
 """
 
 from pathlib import Path
-from typing import Dict
+from typing import Dict, TypedDict
 
 import yaml
 
 # Path to the device configuration file
 CONFIG_PATH = Path("hosts.yaml")
 
+# Device configuration structure
+class DeviceConfig(TypedDict):
+    """Type definition for device configuration."""
+    name: str
+    host: str
+    username: str
+    password: str
+    device_type: str
+
+
 # Cache for loaded device configurations to avoid repeated file I/O
-_DEVICES_CACHE: dict[str, dict] | None = None
+_DEVICES_CACHE: dict[str, DeviceConfig] | None = None
 _LAST_MOD_TIME: float | None = None
 
 
-def load_devices() -> dict[str, dict]:
+def load_devices() -> dict[str, DeviceConfig]:
     """Load network device configurations from hosts.yaml file.
 
     This function reads the hosts.yaml file and returns a dictionary
@@ -50,7 +60,7 @@ def load_devices() -> dict[str, dict]:
         cfg = yaml.safe_load(fh)
 
     devices = cfg.get("devices") or []
-    device_dict = {d["name"]: d for d in devices}
+    device_dict: dict[str, DeviceConfig] = {d["name"]: d for d in devices}  # type: ignore
 
     # Update cache
     _DEVICES_CACHE = device_dict
