@@ -13,13 +13,18 @@ import yaml
 # Path to the device configuration file
 CONFIG_PATH = Path("hosts.yaml")
 
+# Cache for loaded device configurations to avoid repeated file I/O
+_DEVICES_CACHE: dict[str, dict] | None = None
+_LAST_MOD_TIME: float | None = None
+
 
 def load_devices() -> dict[str, dict]:
     """Load network device configurations from hosts.yaml file.
 
     This function reads the hosts.yaml file and returns a dictionary
     of device configurations, with device names as keys and their
-    configuration parameters as values.
+    configuration parameters as values. Implements caching to avoid
+    repeated file reads on subsequent calls.
 
     Returns:
         Dictionary mapping device names to their configuration parameters
@@ -28,6 +33,16 @@ def load_devices() -> dict[str, dict]:
     Raises:
         FileNotFoundError: If the hosts.yaml configuration file is not found
     """
+    global _DEVICES_CACHE, _LAST_MOD_TIME
+
+    # Check if file has been modified since last read
+    if CONFIG_PATH.exists():
+        current_mod_time = CONFIG_PATH.stat().st_mtime
+        if _DEVICES_CACHE is not None and _LAST_MOD_TIME == current_mod_time:
+            # Return cached devices if file hasn't changed
+            return _DEVICES_CACHE
+
+    # Load devices from file and cache them
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(f"Device config not found: {CONFIG_PATH}")
 
@@ -35,4 +50,10 @@ def load_devices() -> dict[str, dict]:
         cfg = yaml.safe_load(fh)
 
     devices = cfg.get("devices") or []
-    return {d["name"]: d for d in devices}
+    device_dict = {d["name"]: d for d in devices}
+
+    # Update cache
+    _DEVICES_CACHE = device_dict
+    _LAST_MOD_TIME = current_mod_time
+
+    return device_dict

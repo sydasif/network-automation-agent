@@ -18,6 +18,16 @@ llm = create_llm()
 llm_with_tools = llm.bind_tools([run_command])
 
 
+# Cache for device names to avoid repeated loading in understand_node
+_CACHED_DEVICE_NAMES: list[str] | None = None
+
+
+def clear_device_cache():
+    """Clear the cached device names to force reloading from configuration."""
+    global _CACHED_DEVICE_NAMES
+    _CACHED_DEVICE_NAMES = None
+
+
 def understand_node(state: dict) -> dict:
     """Processes user input and determines if network commands need to be executed.
 
@@ -31,15 +41,19 @@ def understand_node(state: dict) -> dict:
     Returns:
         Updated state with new messages and preserved results
     """
+    global _CACHED_DEVICE_NAMES
+
     messages: list[str] = state.get("messages", [])
 
-    devices = load_devices()
-    device_names = list(devices.keys())
+    # Use cached device names if available, otherwise load and cache them
+    if _CACHED_DEVICE_NAMES is None:
+        devices = load_devices()  # This will use the cached version from utils/devices
+        _CACHED_DEVICE_NAMES = list(devices.keys())
 
     system_msg = SystemMessage(
         content=(
             "You are a network automation assistant.\n"
-            f"Available devices: {', '.join(device_names)}\n"
+            f"Available devices: {', '.join(_CACHED_DEVICE_NAMES)}\n"
             "If user asks to run show commands, call run_command tool."
         )
     )
@@ -101,10 +115,13 @@ def execute_node(state: dict) -> dict:
                 tool_results.append({"tool_call_id": tool_call["id"], "output": result})
 
     # Create ToolMessage objects to pass results back to the LLM
-    tool_messages = [
-        ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
-        for tr in tool_results
-    ]
+    # Pre-allocate list with known size to avoid dynamic resizing
+    tool_messages = []
+    tool_messages_append = tool_messages.append  # Cache the append method
+    for tr in tool_results:
+        tool_messages_append(
+            ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
+        )
 
     return {"messages": messages + tool_messages, "results": state.get("results", {})}
 

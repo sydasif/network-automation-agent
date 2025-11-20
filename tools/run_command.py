@@ -41,11 +41,15 @@ def run_command(device: str | list[str], command: str) -> str:
     else:
         device_list = device
 
+    # Cache the available devices list to avoid repeated calls to .keys()
+    available_devices = list(all_devices.keys())
+
+    # Validate that all requested devices exist
     for dev in device_list:
         if dev not in all_devices:
             return json.dumps({
                 "error": f"Device '{dev}' not found",
-                "available_devices": list(all_devices.keys()),
+                "available_devices": available_devices,
             })
 
     results = {}
@@ -101,7 +105,7 @@ def run_command(device: str | list[str], command: str) -> str:
             return dev_name, {"success": False, "error": str(e)}
 
     # Execute commands in parallel across multiple devices using ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=10) as ex:
+    with ThreadPoolExecutor(max_workers=min(len(device_list), 10)) as ex:
         # Submit tasks for each device to the thread pool
         futures = {ex.submit(execute_on_device, d): d for d in device_list}
         # Process completed tasks as they finish
