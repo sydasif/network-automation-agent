@@ -6,9 +6,15 @@ This module implements the three main nodes in the LangGraph workflow:
 - respond_node: Formats and returns results to the user
 """
 
-from typing import List, Any, TypedDict
+from typing import Any, List, TypedDict
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, BaseMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 
 from llm.setup import create_llm
 from tools.run_command import run_command
@@ -146,7 +152,8 @@ def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     synthesis_prompt = SystemMessage(
         content=(
             "Analyze the command results and provide a concise summary. "
-            "If structured, prefer tables. If raw, extract key lines."
+            "If structured, prefer tables. If raw, extract key lines. "
+            "Break down each device's output separately."
         )
     )
 

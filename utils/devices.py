@@ -13,9 +13,11 @@ import yaml
 # Path to the device configuration file
 CONFIG_PATH = Path("hosts.yaml")
 
+
 # Device configuration structure
 class DeviceConfig(TypedDict):
     """Type definition for device configuration."""
+
     name: str
     host: str
     username: str
@@ -48,7 +50,7 @@ def load_devices() -> dict[str, DeviceConfig]:
     # Check if file has been modified since last read
     if CONFIG_PATH.exists():
         current_mod_time = CONFIG_PATH.stat().st_mtime
-        if _DEVICES_CACHE is not None and _LAST_MOD_TIME == current_mod_time:
+        if _DEVICES_CACHE is not None and current_mod_time == _LAST_MOD_TIME:
             # Return cached devices if file hasn't changed
             return _DEVICES_CACHE
 
