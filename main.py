@@ -4,8 +4,8 @@ This module provides the interactive CLI interface for the network automation ag
 allowing users to communicate with network devices using natural language commands.
 """
 
-from typing import NoReturn
 import logging
+from typing import NoReturn
 
 from langchain_core.messages import AIMessage, HumanMessage
 

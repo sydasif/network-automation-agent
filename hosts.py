@@ -4,6 +4,7 @@ from typing import Dict, Any
 import yaml
 
 from utils.database import Device, get_db, create_db_and_tables
+from utils.devices import invalidate_device_cache
 
 
 def migrate_data():
@@ -31,6 +32,7 @@ def migrate_data():
             print("No devices found in hosts.yaml")
             return
 
+        new_devices_added = False
         for device_data in devices:
             # Check if all required fields exist
             required_fields = ["name", "host", "username", "password", "device_type"]
@@ -53,8 +55,14 @@ def migrate_data():
             )
             db.add(device)
             print(f"Adding device {device_data['name']}.")
+            new_devices_added = True
 
         db.commit()
+
+        # Invalidate the device cache if new devices were added
+        if new_devices_added:
+            invalidate_device_cache()
+
         print("Data migration complete.")
 
 

@@ -40,6 +40,7 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     messages: list[BaseMessage] = state.get("messages", [])
 
+    # Use cached device names to avoid multiple database queries
     with get_db() as db:
         device_names = get_all_device_names(db)
 
@@ -51,12 +52,19 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         )
     )
 
+    # Pre-allocate full_messages list with an appropriate initial size
     full_messages = [system_msg]
+    full_messages_extend = full_messages.extend  # Cache the extend method for performance
+
+    # Convert messages to proper format if needed, using extend for multiple items
+    converted_messages = []
     for m in messages:
         if isinstance(m, str):
-            full_messages.append(HumanMessage(content=m))
+            converted_messages.append(HumanMessage(content=m))
         else:
-            full_messages.append(m)
+            converted_messages.append(m)
+
+    full_messages_extend(converted_messages)
 
     response = llm_with_tools.invoke(full_messages)
 
@@ -88,12 +96,16 @@ def execute_node(state: dict[str, Any]) -> dict[str, Any]:
 
     # Create ToolMessage objects to pass results back to the LLM
     # Pre-allocate list with known size to avoid dynamic resizing
-    tool_messages = []
-    tool_messages_append = tool_messages.append  # Cache the append method
-    for tr in tool_results:
-        tool_messages_append(
-            ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
-        )
+    tool_results_len = len(tool_results)
+    if tool_results_len > 0:
+        tool_messages = [None] * tool_results_len  # Pre-allocate with known size
+        for i, tr in enumerate(tool_results):
+            tool_messages[i] = ToolMessage(
+                content=str(tr["output"]),
+                tool_call_id=tr["tool_call_id"]
+            )
+    else:
+        tool_messages = []
 
     return {"messages": messages + tool_messages, "results": state.get("results", {})}
 

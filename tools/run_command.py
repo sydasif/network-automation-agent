@@ -6,6 +6,7 @@ with parallel processing capabilities.
 """
 
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Union
 
@@ -15,6 +16,10 @@ from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutExc
 
 from utils.database import get_db
 from utils.devices import get_device_by_name, get_all_device_names
+
+
+# Set up logging for the run_command tool
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -36,18 +41,20 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
     Raises:
         Connection errors if unable to connect to specified devices
     """
+    # Use cached device names to avoid multiple database queries
     with get_db() as db:
         all_device_names = get_all_device_names(db)
 
     device_list = [device] if isinstance(device, str) else device
 
     # Validate that all requested devices exist
-    for dev in device_list:
-        if dev not in all_device_names:
-            return json.dumps({
-                "error": f"Device '{dev}' not found",
-                "available_devices": all_device_names,
-            })
+    invalid_devices = [dev for dev in device_list if dev not in all_device_names]
+    if invalid_devices:
+        logger.warning(f"Device(s) not found: {', '.join(invalid_devices)}")
+        return json.dumps({
+            "error": f"Device(s) not found: {', '.join(invalid_devices)}",
+            "available_devices": all_device_names,
+        })
 
     results = {}
 
@@ -60,68 +67,79 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
         Returns:
             Tuple of device name and execution result
         """
-        with get_db() as db_session:
-            try:
+        try:
+            # Get device config from database
+            with get_db() as db_session:
                 cfg = get_device_by_name(db_session, dev_name)
                 if not cfg:
-                    return dev_name, {"success": False, "error": "Device configuration not found in database."}
+                    error_msg = f"Device configuration not found for {dev_name}"
+                    logger.error(error_msg)
+                    return dev_name, {"success": False, "error": error_msg}
 
-                # Establish SSH connection to the device
-                conn = ConnectHandler(
-                    device_type=cfg.device_type,
-                    host=cfg.host,
-                    username=cfg.username,
-                    password=cfg.password,
-                    timeout=30,
-                )
+            # Establish SSH connection to the device
+            conn = ConnectHandler(
+                device_type=cfg.device_type,
+                host=cfg.host,
+                username=cfg.username,
+                password=cfg.password,
+                timeout=30,
+            )
 
-                # Execute command with textfsm parsing - netmiko handles fallback
-                # automatically. If no textfsm template is available or parsing
-                # fails, netmiko returns raw output
-                out = conn.send_command(command, use_textfsm=True)
-                if isinstance(out, str):
-                    # If output is a string, textfsm parsing wasn't applicable
-                    # or failed
-                    parsed_type = "raw"
-                    parsed_output = out
-                else:
-                    # If output is not a string (typically a list of dicts),
-                    # textfsm parsing worked
-                    parsed_type = "structured"
-                    parsed_output = out
+            # Execute command with textfsm parsing - netmiko handles fallback
+            # automatically. If no textfsm template is available or parsing
+            # fails, netmiko returns raw output
+            out = conn.send_command(command, use_textfsm=True)
+            if isinstance(out, str):
+                # If output is a string, textfsm parsing wasn't applicable
+                # or failed
+                parsed_type = "raw"
+                parsed_output = out
+            else:
+                # If output is not a string (typically a list of dicts),
+                # textfsm parsing worked
+                parsed_type = "structured"
+                parsed_output = out
 
-                # Close the SSH connection
-                conn.disconnect()
+            # Close the SSH connection
+            conn.disconnect()
 
-                return dev_name, {
-                    "success": True,
-                    "type": parsed_type,  # Indicates whether output is structured or raw
-                    "data": parsed_output,
-                }
+            return dev_name, {
+                "success": True,
+                "type": parsed_type,  # Indicates whether output is structured or raw
+                "data": parsed_output,
+            }
 
-            except NetmikoAuthenticationException as e:
-                # Handle authentication-specific errors
-                return dev_name, {
-                    "success": False,
-                    "error": f"Authentication failed: {str(e)}",
-                }
-            except NetmikoTimeoutException as e:
-                # Handle timeout-specific errors
-                return dev_name, {
-                    "success": False,
-                    "error": f"Connection timeout: {str(e)}",
-                }
-            except Exception as e:
-                # Return error information if connection or command execution fails
-                return dev_name, {"success": False, "error": f"Connection error: {str(e)}"}
+        except NetmikoAuthenticationException as e:
+            # Handle authentication-specific errors
+            error_msg = f"Authentication failed for device {dev_name}: {str(e)}"
+            logger.error(error_msg)
+            return dev_name, {
+                "success": False,
+                "error": error_msg,
+            }
+        except NetmikoTimeoutException as e:
+            # Handle timeout-specific errors
+            error_msg = f"Connection timeout for device {dev_name}: {str(e)}"
+            logger.error(error_msg)
+            return dev_name, {
+                "success": False,
+                "error": error_msg,
+            }
+        except Exception as e:
+            # Return error information if connection or command execution fails
+            error_msg = f"Connection error for device {dev_name}: {str(e)}"
+            logger.error(error_msg)
+            return dev_name, {"success": False, "error": error_msg}
 
     # Execute commands in parallel across multiple devices using ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=min(len(device_list), 10)) as ex:
+    max_workers = min(len(device_list), 10)  # Limit max workers to prevent resource exhaustion
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit tasks for each device to the thread pool
-        futures = {ex.submit(execute_on_device, d): d for d in device_list}
+        future_to_device = {executor.submit(execute_on_device, dev_name): dev_name for dev_name in device_list}
+
         # Process completed tasks as they finish
-        for fut in as_completed(futures):
-            dev, out = fut.result()
+        for future in as_completed(future_to_device):
+            dev, out = future.result()
             results[dev] = out
 
     return json.dumps({"command": command, "devices": results}, indent=2)
