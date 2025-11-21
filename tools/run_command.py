@@ -42,6 +42,13 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
     Raises:
         Connection errors if unable to connect to specified devices
     """
+    # --- SOLUTION: Add immediate validation for the command argument ---
+    if not command or not command.strip():
+        error_msg = "Input validation error: The 'command' argument cannot be empty."
+        logger.error(error_msg)
+        return json.dumps({"error": error_msg})
+    # --- End of Solution ---
+
     with get_db() as db:
         all_device_names = get_all_device_names(db)
         device_list = [device] if isinstance(device, str) else device
