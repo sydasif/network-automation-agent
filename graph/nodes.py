@@ -9,7 +9,6 @@ This module implements the three main nodes in the LangGraph workflow:
 from typing import Any
 
 from langchain_core.messages import (
-    AIMessage,
     BaseMessage,
     HumanMessage,
     SystemMessage,
@@ -44,16 +43,16 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         device_names = get_all_device_names(db)
 
     system_msg = SystemMessage(
-        content=(
-            "You are a network automation assistant.\n"
-            f"Available devices: {', '.join(device_names)}\n"
-            "If user asks to run show commands, call run_command tool."
-        )
+        content=f"""
+You are a network automation assistant.
+Check device types before issuing commands and adjust commands based on device OS.
+Available tools:
+- run_command: Execute network commands on specified devices.
+Available devices: {", ".join(device_names)}
+"""
     )
 
-    converted_messages = [
-        HumanMessage(content=m) if isinstance(m, str) else m for m in messages
-    ]
+    converted_messages = [HumanMessage(content=m) if isinstance(m, str) else m for m in messages]
     full_messages = [system_msg] + converted_messages
 
     response = llm_with_tools.invoke(full_messages)
