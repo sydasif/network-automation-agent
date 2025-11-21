@@ -7,6 +7,7 @@ with parallel processing capabilities.
 
 import json
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Union
 
@@ -14,7 +15,7 @@ from langchain_core.tools import tool
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
 
-from utils.database import get_db
+from utils.database import Device, get_db
 from utils.devices import get_device_by_name, get_all_device_names
 
 
@@ -41,47 +42,46 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
     Raises:
         Connection errors if unable to connect to specified devices
     """
-    # Use cached device names to avoid multiple database queries
     with get_db() as db:
         all_device_names = get_all_device_names(db)
+        device_list = [device] if isinstance(device, str) else device
+        invalid_devices = [dev for dev in device_list if dev not in all_device_names]
+        if invalid_devices:
+            logger.warning(f"Device(s) not found: {', '.join(invalid_devices)}")
+            return json.dumps({
+                "error": f"Device(s) not found: {', '.join(invalid_devices)}",
+                "available_devices": all_device_names,
+            })
 
-    device_list = [device] if isinstance(device, str) else device
-
-    # Validate that all requested devices exist
-    invalid_devices = [dev for dev in device_list if dev not in all_device_names]
-    if invalid_devices:
-        logger.warning(f"Device(s) not found: {', '.join(invalid_devices)}")
-        return json.dumps({
-            "error": f"Device(s) not found: {', '.join(invalid_devices)}",
-            "available_devices": all_device_names,
-        })
+        # Pre-fetch all device configurations
+        devices_to_run = db.query(Device).filter(Device.name.in_(device_list)).all()
+        device_configs = {dev.name: dev for dev in devices_to_run}
 
     results = {}
 
-    def execute_on_device(dev_name: str) -> tuple[str, dict[str, Any]]:
+    def execute_on_device(cfg: Device) -> tuple[str, dict[str, Any]]:
         """Helper function to execute a command on a single device.
 
         Args:
-            dev_name: Name of the device to execute the command on
+            cfg: The device configuration object
 
         Returns:
             Tuple of device name and execution result
         """
+        dev_name = cfg.name
         try:
-            # Get device config from database
-            with get_db() as db_session:
-                cfg = get_device_by_name(db_session, dev_name)
-                if not cfg:
-                    error_msg = f"Device configuration not found for {dev_name}"
-                    logger.error(error_msg)
-                    return dev_name, {"success": False, "error": error_msg}
+            password = os.environ.get(cfg.password_env_var)
+            if not password:
+                error_msg = f"Password environment variable {cfg.password_env_var} not set for device {dev_name}"
+                logger.error(error_msg)
+                return dev_name, {"success": False, "error": error_msg}
 
             # Establish SSH connection to the device
             conn = ConnectHandler(
                 device_type=cfg.device_type,
                 host=cfg.host,
                 username=cfg.username,
-                password=cfg.password,
+                password=password,
                 timeout=30,
             )
 
@@ -90,54 +90,40 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
             # fails, netmiko returns raw output
             out = conn.send_command(command, use_textfsm=True)
             if isinstance(out, str):
-                # If output is a string, textfsm parsing wasn't applicable
-                # or failed
                 parsed_type = "raw"
                 parsed_output = out
             else:
-                # If output is not a string (typically a list of dicts),
-                # textfsm parsing worked
                 parsed_type = "structured"
                 parsed_output = out
 
-            # Close the SSH connection
             conn.disconnect()
 
             return dev_name, {
                 "success": True,
-                "type": parsed_type,  # Indicates whether output is structured or raw
+                "type": parsed_type,
                 "data": parsed_output,
             }
 
         except NetmikoAuthenticationException as e:
-            # Handle authentication-specific errors
             error_msg = f"Authentication failed for device {dev_name}: {str(e)}"
             logger.error(error_msg)
-            return dev_name, {
-                "success": False,
-                "error": error_msg,
-            }
+            return dev_name, {"success": False, "error": error_msg}
         except NetmikoTimeoutException as e:
-            # Handle timeout-specific errors
             error_msg = f"Connection timeout for device {dev_name}: {str(e)}"
             logger.error(error_msg)
-            return dev_name, {
-                "success": False,
-                "error": error_msg,
-            }
+            return dev_name, {"success": False, "error": error_msg}
         except Exception as e:
-            # Return error information if connection or command execution fails
             error_msg = f"Connection error for device {dev_name}: {str(e)}"
             logger.error(error_msg)
             return dev_name, {"success": False, "error": error_msg}
 
-    # Execute commands in parallel across multiple devices using ThreadPoolExecutor
-    max_workers = min(len(device_list), 10)  # Limit max workers to prevent resource exhaustion
+    max_workers = min(len(device_list), 10)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit tasks for each device to the thread pool
-        future_to_device = {executor.submit(execute_on_device, dev_name): dev_name for dev_name in device_list}
+        future_to_device = {
+            executor.submit(execute_on_device, device_configs[dev_name]): dev_name
+            for dev_name in device_list
+        }
 
-        # Process completed tasks as they finish
         for future in as_completed(future_to_device):
             dev, out = future.result()
             results[dev] = out

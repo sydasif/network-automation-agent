@@ -33,14 +33,13 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     whether to call tools (execute commands) or respond directly to the user.
 
     Args:
-        state: The current state of the conversation containing messages and results
+        state: The current state of the conversation containing messages.
 
     Returns:
-        Updated state with new messages and preserved results
+        Updated state with new messages.
     """
     messages: list[BaseMessage] = state.get("messages", [])
 
-    # Use cached device names to avoid multiple database queries
     with get_db() as db:
         device_names = get_all_device_names(db)
 
@@ -52,23 +51,15 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         )
     )
 
-    # Pre-allocate full_messages list with an appropriate initial size
-    full_messages = [system_msg]
-    full_messages_extend = full_messages.extend  # Cache the extend method for performance
-
-    # Convert messages to proper format if needed, using extend for multiple items
-    converted_messages = []
-    for m in messages:
-        if isinstance(m, str):
-            converted_messages.append(HumanMessage(content=m))
-        else:
-            converted_messages.append(m)
-
-    full_messages_extend(converted_messages)
+    converted_messages = [
+        HumanMessage(content=m) if isinstance(m, str) else m for m in messages
+    ]
+    full_messages = [system_msg] + converted_messages
 
     response = llm_with_tools.invoke(full_messages)
 
-    return {"messages": messages + [response], "results": state.get("results", {})}
+    return {"messages": messages + [response]}
+
 
 def execute_node(state: dict[str, Any]) -> dict[str, Any]:
     """Executes network commands on specified devices based on tool calls.
@@ -81,7 +72,7 @@ def execute_node(state: dict[str, Any]) -> dict[str, Any]:
         state: The current state containing messages with tool calls
 
     Returns:
-        Updated state with tool response messages and preserved results
+        Updated state with tool response messages.
     """
     messages = state["messages"]
     last = messages[-1]
@@ -90,24 +81,15 @@ def execute_node(state: dict[str, Any]) -> dict[str, Any]:
     if hasattr(last, "tool_calls"):
         for tool_call in last.tool_calls:
             if tool_call["name"] == "run_command":
-                # tool_call["args"] is the dict of arguments the tool expects
                 result = run_command.invoke(tool_call["args"])
                 tool_results.append({"tool_call_id": tool_call["id"], "output": result})
 
-    # Create ToolMessage objects to pass results back to the LLM
-    # Pre-allocate list with known size to avoid dynamic resizing
-    tool_results_len = len(tool_results)
-    if tool_results_len > 0:
-        tool_messages = [None] * tool_results_len  # Pre-allocate with known size
-        for i, tr in enumerate(tool_results):
-            tool_messages[i] = ToolMessage(
-                content=str(tr["output"]),
-                tool_call_id=tr["tool_call_id"]
-            )
-    else:
-        tool_messages = []
+    tool_messages = [
+        ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
+        for tr in tool_results
+    ]
 
-    return {"messages": messages + tool_messages, "results": state.get("results", {})}
+    return {"messages": messages + tool_messages}
 
 
 def respond_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -118,16 +100,12 @@ def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     that guides the LLM to format the output appropriately.
 
     Args:
-        state: The current state containing messages and results
+        state: The current state containing messages.
 
     Returns:
-        Updated state with the final response message and preserved results
+        Updated state with the final response message.
     """
     messages = state["messages"]
-    last = messages[-1]
-
-    if isinstance(last, AIMessage) and not hasattr(last, "tool_calls"):
-        return state
 
     synthesis_prompt = SystemMessage(
         content=(
@@ -139,4 +117,4 @@ def respond_node(state: dict[str, Any]) -> dict[str, Any]:
 
     response = llm.invoke(messages + [synthesis_prompt])
 
-    return {"messages": messages + [response], "results": state.get("results", {})}
+    return {"messages": messages + [response]}

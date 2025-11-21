@@ -1,10 +1,8 @@
 from pathlib import Path
-from typing import Dict, Any
 
 import yaml
 
-from utils.database import Device, get_db, create_db_and_tables
-from utils.devices import invalidate_device_cache
+from utils.database import Device, create_db_and_tables, get_db
 
 
 def migrate_data():
@@ -35,7 +33,7 @@ def migrate_data():
         new_devices_added = False
         for device_data in devices:
             # Check if all required fields exist
-            required_fields = ["name", "host", "username", "password", "device_type"]
+            required_fields = ["name", "host", "username", "password_env_var", "device_type"]
             missing_fields = [field for field in required_fields if field not in device_data]
             if missing_fields:
                 print(f"Skipping device due to missing fields: {missing_fields}")
@@ -50,7 +48,7 @@ def migrate_data():
                 name=device_data["name"],
                 host=device_data["host"],
                 username=device_data["username"],
-                password=device_data["password"],
+                password_env_var=device_data["password_env_var"],
                 device_type=device_data["device_type"],
             )
             db.add(device)
@@ -58,10 +56,6 @@ def migrate_data():
             new_devices_added = True
 
         db.commit()
-
-        # Invalidate the device cache if new devices were added
-        if new_devices_added:
-            invalidate_device_cache()
 
         print("Data migration complete.")
 

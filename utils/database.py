@@ -16,7 +16,7 @@ class Device(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     host = Column(String, nullable=False)
     username = Column(String, nullable=False)
-    password = Column(String, nullable=False)
+    password_env_var = Column(String, nullable=False)
     device_type = Column(String, nullable=False)
 
 @contextmanager

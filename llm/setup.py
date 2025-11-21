@@ -32,5 +32,7 @@ def create_llm(api_key: str | None = None):
     if not api_key:
         raise RuntimeError("GROQ_API_KEY not set in environment")
 
-    llm = ChatGroq(temperature=0.7, model_name="openai/gpt-oss-20b", api_key=api_key)
+    model_name = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-20b")
+
+    llm = ChatGroq(temperature=0.7, model_name=model_name, api_key=api_key)
     return llm
