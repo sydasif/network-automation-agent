@@ -40,9 +40,8 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     messages: list[BaseMessage] = state.get("messages", [])
 
-    db = next(get_db())
-    device_names = get_all_device_names(db)
-    db.close()
+    with get_db() as db:
+        device_names = get_all_device_names(db)
 
     system_msg = SystemMessage(
         content=(
@@ -62,7 +61,6 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     response = llm_with_tools.invoke(full_messages)
 
     return {"messages": messages + [response], "results": state.get("results", {})}
-
 
 def execute_node(state: dict[str, Any]) -> dict[str, Any]:
     """Executes network commands on specified devices based on tool calls.

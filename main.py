@@ -4,12 +4,15 @@ This module provides the interactive CLI interface for the network automation ag
 allowing users to communicate with network devices using natural language commands.
 """
 
+from typing import NoReturn
+import logging
+
 from langchain_core.messages import AIMessage, HumanMessage
 
 from graph.router import create_graph
 
 
-def main():
+def main() -> NoReturn:
     """Initialize and run the Network AI Agent in interactive mode.
 
     The function creates a graph-based workflow for processing user input,
@@ -19,7 +22,14 @@ def main():
     The agent maintains conversation history and interacts with network
     devices through the configured LangGraph workflow.
     """
-    app = create_graph()
+    # Set up logging
+    logging.basicConfig(level=logging.INFO)
+
+    try:
+        app = create_graph()
+    except Exception as e:
+        logging.error(f"Failed to initialize the agent: {e}")
+        return
 
     print("🤖 Network AI Agent Ready!")
     print("Type 'quit' to exit.\n")
@@ -56,7 +66,7 @@ def main():
             print("\nGoodbye!")
             break
         except Exception as e:
-            print(f"Error: {e}")
+            logging.error(f"Error processing request: {e}")
 
 
 if __name__ == "__main__":

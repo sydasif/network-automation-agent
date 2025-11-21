@@ -1,5 +1,6 @@
 """Utility module for managing network device configurations."""
 from sqlalchemy.orm import Session
+from typing import List
 from .database import Device
 
 def get_device_by_name(db: Session, device_name: str) -> Device | None:
@@ -15,7 +16,7 @@ def get_device_by_name(db: Session, device_name: str) -> Device | None:
     """
     return db.query(Device).filter(Device.name == device_name).first()
 
-def get_all_device_names(db: Session) -> list[str]:
+def get_all_device_names(db: Session) -> List[str]:
     """
     Retrieves a list of all device names from the database.
 
