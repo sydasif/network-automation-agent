@@ -7,7 +7,7 @@ with parallel processing capabilities.
 
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from langchain_core.tools import tool
 from netmiko import ConnectHandler
@@ -37,10 +37,7 @@ def run_command(device: str | list[str], command: str) -> str:
     """
     all_devices = load_devices()
 
-    if isinstance(device, str):
-        device_list = [device]
-    else:
-        device_list = device
+    device_list = [device] if isinstance(device, str) else device
 
     # Cache the available devices list to avoid repeated calls to .keys()
     available_devices = list(all_devices.keys())
@@ -75,21 +72,19 @@ def run_command(device: str | list[str], command: str) -> str:
                 timeout=30,
             )
 
-            try:
-                # Attempt to execute command with textfsm parsing for structured output
-                out = conn.send_command(command, use_textfsm=True)
-                if isinstance(out, str):
-                    # If output is a string, it means textfsm parsing failed or wasn't applicable
-                    parsed_type = "raw"
-                    parsed_output = out
-                else:
-                    # If output is not a string (typically a list of dicts), textfsm parsing worked
-                    parsed_type = "structured"
-                    parsed_output = out
-            except Exception:
-                # If textfsm parsing fails, execute command without parsing
-                out = conn.send_command(command)
+            # Execute command with textfsm parsing - netmiko handles fallback
+            # automatically. If no textfsm template is available or parsing
+            # fails, netmiko returns raw output
+            out = conn.send_command(command, use_textfsm=True)
+            if isinstance(out, str):
+                # If output is a string, textfsm parsing wasn't applicable
+                # or failed
                 parsed_type = "raw"
+                parsed_output = out
+            else:
+                # If output is not a string (typically a list of dicts),
+                # textfsm parsing worked
+                parsed_type = "structured"
                 parsed_output = out
 
             # Close the SSH connection
