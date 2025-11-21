@@ -16,7 +16,7 @@ from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
 
 from utils.database import Device, get_db
-from utils.devices import get_device_by_name, get_all_device_names
+from utils.devices import get_all_device_names
 
 
 # Set up logging for the run_command tool
@@ -42,12 +42,10 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
     Raises:
         Connection errors if unable to connect to specified devices
     """
-    # --- SOLUTION: Add immediate validation for the command argument ---
+
     if not command or not command.strip():
         error_msg = "Input validation error: The 'command' argument cannot be empty."
         logger.error(error_msg)
-        return json.dumps({"error": error_msg})
-    # --- End of Solution ---
 
     with get_db() as db:
         all_device_names = get_all_device_names(db)
@@ -55,10 +53,12 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
         invalid_devices = [dev for dev in device_list if dev not in all_device_names]
         if invalid_devices:
             logger.warning(f"Device(s) not found: {', '.join(invalid_devices)}")
-            return json.dumps({
-                "error": f"Device(s) not found: {', '.join(invalid_devices)}",
-                "available_devices": all_device_names,
-            })
+            return json.dumps(
+                {
+                    "error": f"Device(s) not found: {', '.join(invalid_devices)}",
+                    "available_devices": all_device_names,
+                }
+            )
 
         # Pre-fetch all device configurations
         devices_to_run = db.query(Device).filter(Device.name.in_(device_list)).all()
@@ -77,7 +77,6 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
         """
         dev_name = cfg.name
         try:
-            # --- SOLUTION: Explicitly validate password before attempting connection ---
             password = os.environ.get(cfg.password_env_var)
             if not password:
                 # This check handles both None (not set) and empty string.
@@ -88,7 +87,6 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
                 logger.error(error_msg)
                 # Return a structured failure immediately.
                 return dev_name, {"success": False, "error": error_msg}
-            # --- End of Solution ---
 
             # Establish SSH connection to the device
             conn = ConnectHandler(
@@ -142,7 +140,6 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
             dev, out = future.result()
             results[dev] = out
 
-    # --- SOLUTION: Add a summary of execution results ---
     successful_count = 0
     failed_count = 0
     for device_name, result in results.items():
@@ -156,12 +153,11 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
         "successful": successful_count,
         "failed": failed_count,
     }
-    # --- End of Solution ---
 
     return json.dumps(
         {
             "command": command,
-            "summary": summary, # Add the summary to the output
+            "summary": summary,  # Add the summary to the output
             "devices": results,
         },
         indent=2,

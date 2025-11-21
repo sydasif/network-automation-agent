@@ -1,4 +1,5 @@
 """Utility module for managing network device configurations."""
+
 from sqlalchemy.orm import Session
 from typing import List
 from .database import Device
@@ -37,7 +38,6 @@ def get_all_device_names(db: Session) -> List[str]:
     return device_names
 
 
-# --- SOLUTION: Add a function to clear the cache ---
 def clear_device_cache():
     """
     Clears the device names cache.
@@ -45,4 +45,3 @@ def clear_device_cache():
     """
     _device_names_cache.clear()
     print("Device cache cleared.")
-# --- End of Solution ---

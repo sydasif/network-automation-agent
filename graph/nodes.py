@@ -15,7 +15,8 @@ from langchain_core.messages import (
     ToolMessage,
 )
 
-from llm.setup import create_llm
+from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
+from llm.client import create_llm
 from tools.run_command import run_command
 from utils.database import get_db
 from utils.devices import get_all_device_names
@@ -43,13 +44,7 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         device_names = get_all_device_names(db)
 
     system_msg = SystemMessage(
-        content=f"""
-You are a network automation assistant.
-Check device types before issuing commands and adjust commands based on device OS.
-Available tools:
-- run_command: Execute network commands on specified devices.
-Available devices: {", ".join(device_names)}
-"""
+        content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))
     )
 
     converted_messages = [HumanMessage(content=m) if isinstance(m, str) else m for m in messages]
@@ -106,13 +101,7 @@ def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     messages = state["messages"]
 
-    synthesis_prompt = SystemMessage(
-        content=(
-            "Analyze the command results and provide a concise summary. "
-            "If structured, prefer tables. If raw, extract key lines. "
-            "Break down each device's output separately."
-        )
-    )
+    synthesis_prompt = SystemMessage(content=RESPOND_PROMPT)
 
     response = llm.invoke(messages + [synthesis_prompt])
 

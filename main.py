@@ -5,36 +5,14 @@ allowing users to communicate with network devices using natural language comman
 """
 
 import logging
-from typing import NoReturn
 
 from langchain_core.messages import AIMessage, HumanMessage
 
 from graph.router import create_graph
 
 
-def main() -> NoReturn:
-    """Initialize and run the Network AI Agent in interactive mode.
-
-    The function creates a graph-based workflow for processing user input,
-    executing network commands, and returning formatted responses. It runs
-    in a continuous loop until the user types 'quit', 'exit', or 'q'.
-
-    The agent maintains conversation history and interacts with network
-    devices through the configured LangGraph workflow.
-    """
-    # Set up logging
-    logging.basicConfig(level=logging.INFO)
-
-    try:
-        app = create_graph()
-    except Exception as e:
-        logging.error(f"Failed to initialize the agent: {e}")
-        return
-
-    print("🤖 Network AI Agent Ready!")
-    print("Type 'quit' to exit.\n")
-
-    # Define a thread_id for the conversation
+def chat_loop(app) -> None:
+    """Handles the interactive chat session with the user."""
     config = {"configurable": {"thread_id": "network-agent-conversation"}}
 
     while True:
@@ -47,13 +25,9 @@ def main() -> NoReturn:
             if not user_input:
                 continue
 
-            # Use HumanMessage to wrap the user input
             messages = [HumanMessage(content=user_input)]
-
-            # Invoke the app with the new message and config
             result = app.invoke({"messages": messages, "results": {}}, config)
 
-            # The response will be in the last message
             final_message = result["messages"][-1]
             if isinstance(final_message, AIMessage):
                 response_text = final_message.content
@@ -67,6 +41,30 @@ def main() -> NoReturn:
             break
         except Exception as e:
             logging.error(f"Error processing request: {e}")
+
+
+def main() -> None:
+    """Initialize and run the Network AI Agent in interactive mode.
+
+    The function creates a graph-based workflow for processing user input,
+    executing network commands, and returning formatted responses. It runs
+    in a continuous loop until the user types 'quit', 'exit', or 'q'.
+
+    The agent maintains conversation history and interacts with network
+    devices through the configured LangGraph workflow.
+    """
+    logging.basicConfig(level=logging.INFO)
+
+    try:
+        app = create_graph()
+    except Exception as e:
+        logging.error(f"Failed to initialize the agent: {e}")
+        return
+
+    print("🤖 Network AI Agent Ready!")
+    print("Type 'quit' to exit.\n")
+
+    chat_loop(app)
 
 
 if __name__ == "__main__":

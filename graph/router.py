@@ -5,7 +5,7 @@ flow between understanding user requests, executing network commands, and
 responding to the user with formatted results.
 """
 
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import MemorySaver
@@ -24,6 +24,24 @@ class State(TypedDict):
 
     messages: list[BaseMessage]
     results: dict[str, Any]
+
+
+def should_execute(state: State) -> Literal["execute", "respond"]:
+    """Determines the next step in the workflow.
+
+    If the last message in the state has tool calls, it routes to the 'execute' node.
+    Otherwise, it routes to the 'respond' node.
+
+    Args:
+        state: The current state of the workflow.
+
+    Returns:
+        'execute' or 'respond'
+    """
+    last_message = state["messages"][-1]
+    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "execute"
+    return "respond"
 
 
 def create_graph():
@@ -47,18 +65,12 @@ def create_graph():
     workflow.add_node("respond", respond_node)
 
     workflow.set_entry_point("understand")
-    # Conditional edge from 'understand' node: route to 'execute' if LLM
-    # generated tool calls, else route directly to 'respond'
     workflow.add_conditional_edges(
         "understand",
-        lambda s: "execute"
-        if hasattr(s["messages"][-1], "tool_calls") and s["messages"][-1].tool_calls
-        else "respond",
-        {"execute": "execute", "respond": END},
+        should_execute,
+        {"execute": "execute", "respond": "respond"},
     )
     workflow.add_edge("execute", "respond")
     workflow.add_edge("respond", END)
 
-    return workflow.compile(
-        checkpointer=MemorySaver()
-    )
+    return workflow.compile(checkpointer=MemorySaver())

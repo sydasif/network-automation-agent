@@ -3,9 +3,8 @@ from pathlib import Path
 import yaml
 
 from utils.database import Device, create_db_and_tables, get_db
-# --- SOLUTION: Import the new cache clearing function ---
+
 from utils.devices import clear_device_cache
-# --- End of Solution ---
 
 
 def migrate_data():
@@ -60,9 +59,9 @@ def migrate_data():
 
         if new_devices_added:
             db.commit()
-            # --- SOLUTION: Clear the cache after updating the database ---
+
             clear_device_cache()
-            # --- End of Solution ---
+
             print("Data migration complete.")
         else:
             print("No new devices to add.")
