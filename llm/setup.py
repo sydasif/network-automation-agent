@@ -34,5 +34,10 @@ def create_llm(api_key: str | None = None):
 
     model_name = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-20b")
 
-    llm = ChatGroq(temperature=0.7, model_name=model_name, api_key=api_key)
+    # --- SOLUTION: Lower the temperature for more deterministic, reliable output ---
+    # A lower temperature is crucial for an automation agent to ensure it
+    # correctly interprets commands and device names, reducing the risk of
+    # "hallucinations" or unpredictable behavior.
+    llm = ChatGroq(temperature=0.2, model_name=model_name, api_key=api_key)
+    # --- End of Solution ---
     return llm
