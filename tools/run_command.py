@@ -53,20 +53,21 @@ def run_command(device: str | list[str], command: str) -> str:
 
     results = {}
 
-    def execute_on_device(db_session: Session, dev_name: str) -> tuple[str, dict[str, Any]]:
+    def execute_on_device(dev_name: str) -> tuple[str, dict[str, Any]]:
         """Helper function to execute a command on a single device.
 
         Args:
-            db_session: The database session.
             dev_name: Name of the device to execute the command on
 
         Returns:
             Tuple of device name and execution result
         """
-        cfg = get_device_by_name(db_session, dev_name)
-        if not cfg:
-            return dev_name, {"success": False, "error": "Device configuration not found in database."}
+        db_session = next(get_db())
         try:
+            cfg = get_device_by_name(db_session, dev_name)
+            if not cfg:
+                return dev_name, {"success": False, "error": "Device configuration not found in database."}
+            
             # Establish SSH connection to the device
             conn = ConnectHandler(
                 device_type=cfg.device_type,
@@ -115,11 +116,13 @@ def run_command(device: str | list[str], command: str) -> str:
         except Exception as e:
             # Return error information if connection or command execution fails
             return dev_name, {"success": False, "error": f"Connection error: {str(e)}"}
+        finally:
+            db_session.close()
 
     # Execute commands in parallel across multiple devices using ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=min(len(device_list), 10)) as ex:
         # Submit tasks for each device to the thread pool
-        futures = {ex.submit(execute_on_device, db, d): d for d in device_list}
+        futures = {ex.submit(execute_on_device, d): d for d in device_list}
         # Process completed tasks as they finish
         for fut in as_completed(futures):
             dev, out = fut.result()
