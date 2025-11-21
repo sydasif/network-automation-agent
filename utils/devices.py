@@ -1,6 +1,6 @@
 """Utility module for managing network device configurations."""
 from sqlalchemy.orm import Session
-from .database import Device, get_db
+from .database import Device
 
 def get_device_by_name(db: Session, device_name: str) -> Device | None:
     """

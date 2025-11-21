@@ -72,7 +72,7 @@ In today's complex network environments, managing and troubleshooting devices ca
    Next, run the migration script to create the database and import the devices from your `hosts.yaml` file:
 
     ```bash
-    uv run migrate_yaml_to_db.py
+    uv run hosts.py
     ```
 
    This will create an `inventory.db` file. Once the migration is complete, the `hosts.yaml` file is no longer used for operations.

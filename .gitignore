@@ -13,3 +13,4 @@ net_lab/
 repomix*
 .env
 todo.md
+hosts.yaml

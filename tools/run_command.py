@@ -12,7 +12,6 @@ from typing import Any
 from langchain_core.tools import tool
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
-from sqlalchemy.orm import Session
 
 from utils.database import get_db
 from utils.devices import get_device_by_name, get_all_device_names
@@ -67,7 +66,7 @@ def run_command(device: str | list[str], command: str) -> str:
             cfg = get_device_by_name(db_session, dev_name)
             if not cfg:
                 return dev_name, {"success": False, "error": "Device configuration not found in database."}
-            
+
             # Establish SSH connection to the device
             conn = ConnectHandler(
                 device_type=cfg.device_type,
@@ -127,6 +126,6 @@ def run_command(device: str | list[str], command: str) -> str:
         for fut in as_completed(futures):
             dev, out = fut.result()
             results[dev] = out
-    
+
     db.close()
     return json.dumps({"command": command, "devices": results}, indent=2)
