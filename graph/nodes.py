@@ -6,7 +6,7 @@ This module implements the three main nodes in the LangGraph workflow:
 - respond_node: Formats and returns results to the user
 """
 
-from typing import Any, List, TypedDict
+from typing import Any
 
 from langchain_core.messages import (
     AIMessage,
@@ -74,24 +74,6 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     response = llm_with_tools.invoke(full_messages)
 
     return {"messages": messages + [response], "results": state.get("results", {})}
-
-
-def should_execute_tools(state: dict[str, Any]) -> str:
-    """Determines if the workflow should execute tools or respond directly.
-
-    This function checks if the last message in the state contains tool calls
-    that need to be executed.
-
-    Args:
-        state: The current state of the conversation
-
-    Returns:
-        String indicating the next step: "execute" if tools need to run, "respond" otherwise
-    """
-    last = state["messages"][-1]
-    if hasattr(last, "tool_calls") and last.tool_calls:
-        return "execute"
-    return "respond"
 
 
 def execute_node(state: dict[str, Any]) -> dict[str, Any]:
