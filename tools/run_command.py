@@ -135,4 +135,27 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
             dev, out = future.result()
             results[dev] = out
 
-    return json.dumps({"command": command, "devices": results}, indent=2)
+    # --- SOLUTION: Add a summary of execution results ---
+    successful_count = 0
+    failed_count = 0
+    for device_name, result in results.items():
+        if result.get("success"):
+            successful_count += 1
+        else:
+            failed_count += 1
+
+    summary = {
+        "total_devices": len(results),
+        "successful": successful_count,
+        "failed": failed_count,
+    }
+    # --- End of Solution ---
+
+    return json.dumps(
+        {
+            "command": command,
+            "summary": summary, # Add the summary to the output
+            "devices": results,
+        },
+        indent=2,
+    )
