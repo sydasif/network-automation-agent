@@ -35,3 +35,14 @@ def get_all_device_names(db: Session) -> List[str]:
     """
     device_names = [device.name for device in db.query(Device.name).all()]
     return device_names
+
+
+# --- SOLUTION: Add a function to clear the cache ---
+def clear_device_cache():
+    """
+    Clears the device names cache.
+    This should be called whenever the device inventory in the database is modified.
+    """
+    _device_names_cache.clear()
+    print("Device cache cleared.")
+# --- End of Solution ---
