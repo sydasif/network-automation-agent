@@ -18,20 +18,11 @@ from langchain_core.messages import (
 
 from llm.setup import create_llm
 from tools.run_command import run_command
-from utils.devices import load_devices
+from utils.database import get_db
+from utils.devices import get_all_device_names
 
 llm = create_llm()
 llm_with_tools = llm.bind_tools([run_command])
-
-
-# Cache for device names to avoid repeated loading in understand_node
-_CACHED_DEVICE_NAMES: list[str] | None = None
-
-
-def clear_device_cache():
-    """Clear the cached device names to force reloading from configuration."""
-    global _CACHED_DEVICE_NAMES
-    _CACHED_DEVICE_NAMES = None
 
 
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -47,19 +38,16 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Updated state with new messages and preserved results
     """
-    global _CACHED_DEVICE_NAMES
-
     messages: list[BaseMessage] = state.get("messages", [])
 
-    # Use cached device names if available, otherwise load and cache them
-    if _CACHED_DEVICE_NAMES is None:
-        devices = load_devices()  # This will use the cached version from utils/devices
-        _CACHED_DEVICE_NAMES = list(devices.keys())
+    db = next(get_db())
+    device_names = get_all_device_names(db)
+    db.close()
 
     system_msg = SystemMessage(
         content=(
             "You are a network automation assistant.\n"
-            f"Available devices: {', '.join(_CACHED_DEVICE_NAMES)}\n"
+            f"Available devices: {', '.join(device_names)}\n"
             "If user asks to run show commands, call run_command tool."
         )
     )

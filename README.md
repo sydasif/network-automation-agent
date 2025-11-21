@@ -45,8 +45,13 @@ In today's complex network environments, managing and troubleshooting devices ca
 
     Then, add your Groq API key to the newly created `.env` file.
 
-4. **Configure your network devices**:
-    Edit the `hosts.yaml` file to add your network devices:
+4. **Configure and Migrate Your Network Devices**:
+
+   The device inventory is now managed by a SQLite database (`inventory.db`) for improved performance and scalability. To populate it, follow this two-step process:
+
+   **Step 1: Configure `hosts.yaml`**
+
+   First, add your network device details to the `hosts.yaml` file. This file is used only for the initial data migration.
 
     ```yaml
     devices:
@@ -61,6 +66,16 @@ In today's complex network environments, managing and troubleshooting devices ca
         password: password123
         device_type: cisco_ios
     ```
+
+   **Step 2: Run the Migration Script**
+
+   Next, run the migration script to create the database and import the devices from your `hosts.yaml` file:
+
+    ```bash
+    uv run migrate_yaml_to_db.py
+    ```
+
+   This will create an `inventory.db` file. Once the migration is complete, the `hosts.yaml` file is no longer used for operations.
 
 ## Usage
 

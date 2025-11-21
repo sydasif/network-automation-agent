@@ -12,8 +12,10 @@ from typing import Any
 from langchain_core.tools import tool
 from netmiko import ConnectHandler
 from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
+from sqlalchemy.orm import Session
 
-from utils.devices import DeviceConfig, load_devices
+from utils.database import get_db
+from utils.devices import get_device_by_name, get_all_device_names
 
 
 @tool
@@ -35,40 +37,42 @@ def run_command(device: str | list[str], command: str) -> str:
     Raises:
         Connection errors if unable to connect to specified devices
     """
-    all_devices = load_devices()
+    db = next(get_db())
+    all_device_names = get_all_device_names(db)
 
     device_list = [device] if isinstance(device, str) else device
 
-    # Cache the available devices list to avoid repeated calls to .keys()
-    available_devices = list(all_devices.keys())
-
     # Validate that all requested devices exist
     for dev in device_list:
-        if dev not in all_devices:
+        if dev not in all_device_names:
+            db.close()
             return json.dumps({
                 "error": f"Device '{dev}' not found",
-                "available_devices": available_devices,
+                "available_devices": all_device_names,
             })
 
     results = {}
 
-    def execute_on_device(dev_name: str) -> tuple[str, dict[str, Any]]:
+    def execute_on_device(db_session: Session, dev_name: str) -> tuple[str, dict[str, Any]]:
         """Helper function to execute a command on a single device.
 
         Args:
+            db_session: The database session.
             dev_name: Name of the device to execute the command on
 
         Returns:
             Tuple of device name and execution result
         """
-        cfg: DeviceConfig = all_devices[dev_name]
+        cfg = get_device_by_name(db_session, dev_name)
+        if not cfg:
+            return dev_name, {"success": False, "error": "Device configuration not found in database."}
         try:
             # Establish SSH connection to the device
             conn = ConnectHandler(
-                device_type=cfg["device_type"],
-                host=cfg["host"],
-                username=cfg["username"],
-                password=cfg["password"],
+                device_type=cfg.device_type,
+                host=cfg.host,
+                username=cfg.username,
+                password=cfg.password,
                 timeout=30,
             )
 
@@ -115,10 +119,11 @@ def run_command(device: str | list[str], command: str) -> str:
     # Execute commands in parallel across multiple devices using ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=min(len(device_list), 10)) as ex:
         # Submit tasks for each device to the thread pool
-        futures = {ex.submit(execute_on_device, d): d for d in device_list}
+        futures = {ex.submit(execute_on_device, db, d): d for d in device_list}
         # Process completed tasks as they finish
         for fut in as_completed(futures):
             dev, out = fut.result()
             results[dev] = out
-
+    
+    db.close()
     return json.dumps({"command": command, "devices": results}, indent=2)

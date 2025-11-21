@@ -1,0 +1,32 @@
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+DATABASE_URL = "sqlite:///inventory.db"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class Device(Base):
+    __tablename__ = "devices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+    host = Column(String, nullable=False)
+    username = Column(String, nullable=False)
+    password = Column(String, nullable=False)
+    device_type = Column(String, nullable=False)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def create_db_and_tables():
+    Base.metadata.create_all(bind=engine)
+
+if __name__ == "__main__":
+    create_db_and_tables()
+    print("Database and tables created.")
