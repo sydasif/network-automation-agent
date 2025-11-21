@@ -70,11 +70,18 @@ def run_command(device: Union[str, list[str]], command: str) -> str:
         """
         dev_name = cfg.name
         try:
+            # --- SOLUTION: Explicitly validate password before attempting connection ---
             password = os.environ.get(cfg.password_env_var)
             if not password:
-                error_msg = f"Password environment variable {cfg.password_env_var} not set for device {dev_name}"
+                # This check handles both None (not set) and empty string.
+                error_msg = (
+                    f"Configuration error: The password environment variable "
+                    f"'{cfg.password_env_var}' for device '{dev_name}' is not set or is empty."
+                )
                 logger.error(error_msg)
+                # Return a structured failure immediately.
                 return dev_name, {"success": False, "error": error_msg}
+            # --- End of Solution ---
 
             # Establish SSH connection to the device
             conn = ConnectHandler(
