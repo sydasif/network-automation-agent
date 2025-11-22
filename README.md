@@ -82,10 +82,13 @@ This will create an `inventory.db` file. Once the migration is complete, the `ho
 ### Main Components
 
 #### 1. Application Entry Point (`main.py`)
+
 Contains the interactive CLI interface for the network automation agent. The `chat_loop` function manages the conversation flow between the user and the agent in a continuous loop until the user exits.
 
 #### 2. Graph Router (`graph/router.py`)
+
 Implements a state graph using LangGraph with three main nodes:
+
 - **Understand**: Parses user input and determines if tools need to be executed
 - **Execute**: Runs network commands on specified devices
 - **Respond**: Formats and returns results to the user
@@ -93,29 +96,38 @@ Implements a state graph using LangGraph with three main nodes:
 The workflow uses conditional routing based on whether the LLM has generated tool calls.
 
 #### 3. Graph Nodes (`graph/nodes.py`)
+
 Contains the three core node functions:
+
 - `understand_node`: Analyzes conversation history and creates appropriate system messages
 - `execute_node`: Processes LLM-generated tool calls and executes network commands
 - `respond_node`: Synthesizes results and generates the final response to the user
 
 #### 4. LLM Client (`llm/client.py`)
+
 Provides a function to create and configure a ChatGroq LLM instance optimized for network automation tasks with deterministic responses.
 
 #### 5. Command Execution Tool (`tools/run_command.py`)
+
 A LangChain tool that executes commands on network devices with:
+
 - Parallel execution capabilities
 - Support for single or multiple devices
 - TextFSM parsing for structured output
 - Comprehensive error handling
 
 #### 6. Database Utilities (`utils/database.py`)
+
 Contains SQLAlchemy models and utilities for managing device inventory in SQLite database including:
+
 - `Device` model definition
 - Database engine and session management
 - Context manager for database sessions
 
 #### 7. Device Utilities (`utils/devices.py`)
+
 Provides utility functions for managing device configurations with caching:
+
 - `get_device_by_name`: Retrieves a specific device from the database
 - `get_all_device_names`: Retrieves all device names with caching
 - `clear_device_cache`: Clears the device names cache
@@ -123,7 +135,9 @@ Provides utility functions for managing device configurations with caching:
 ### Core Data Model
 
 #### Device Model
+
 The Device model has the following attributes:
+
 - `id`: Unique identifier for the device record
 - `name`: Unique name identifier for the device
 - `host`: IP address or hostname of the network device
@@ -134,12 +148,14 @@ The Device model has the following attributes:
 ### Tool APIs
 
 #### `run_command` Tool
+
 ```python
 @tool
 def run_command(device: Union[str, list[str]], command: str) -> str:
 ```
 
 Executes a command on one or more network devices. Returns a JSON string containing:
+
 - `command`: The command executed
 - `summary`: Statistics about execution success/failure
 - `devices`: Detailed results for each device
@@ -169,40 +185,75 @@ Here's an example conversation showing how to interact with the Network AI Agent
 🤖 Network AI Agent Ready!
 Type 'quit' to exit.
 
-You: Hi, who are you and what you can do?
+You: Hi,
 
-🤖 Agent: Hello! I'm your network automation assistant, here to help you manage and troubleshoot your network devices.
-I can:
+🤖 Agent: Hi there! 👋 How can I help you with your network today? If you have any device logs, command outputs, or specific questions, just let me know and I’ll break everything down for you.
 
-- **Run show commands** on the devices in your environment (currently `s1` and `s2`).
-- **Parse the output** into structured data so you can easily extract information like interface status, routing tables, or configuration details.
-- **Return the results in JSON** so you can feed them into scripts, dashboards, or other automation tools.
+You: check device version only for all devices
 
-Just let me know which command you'd like to run and on which device(s), and I'll take care of the rest!
+🤖 Agent: **Device Version Summary**
 
-You: ok, can you check only those vlan which are used on device s1.
+| Device | Software Image | Version | Release |
+|--------|----------------|---------|---------|
+| **sw1** | X86_64BI_LINUX_L2-ADVENTERPRISEK9-M | **17.15.1** | fc4 |
+| **sw2** | X86_64BI_LINUX_L2-ADVENTERPRISEK9-M | **17.15.1** | fc4 |
 
-🤖 Agent: **VLANs currently in use on device `s1`**
+*All devices report the same IOS‑XE version (17.15.1) and release (fc4).*
 
-| VLAN ID | VLAN Name   | Status | Interfaces in use |
-|---------|-------------|--------|-------------------|
-| 1       | default     | active | Et0/2, Et0/3      |
+You: now check mgmt interface ip on both devices
 
-All other VLANs (10, 20, 1002-1005) are defined but have no interfaces assigned, so they're not actively used on `s1`.
+🤖 Agent: **Management‑Interface IPs**
 
-You: and device s1 version with uptime only.
+| Device | Likely Management Interface | IP Address |
+|--------|-----------------------------|------------|
+| **sw1** | Ethernet0/0 | **192.168.121.101** |
+| **sw2** | Ethernet0/0 | **192.168.121.102** |
 
-🤖 Agent: **Device `s1` – Version & Uptime**
+*Both switches have their Ethernet0/0 interfaces configured with the 192.168.121.x addresses, which are typically used for out‑of‑band management.*
 
-| Item          | Value                     |
-|---------------|---------------------------|
-| Software Image| X86_64BI_LINUX_L2-ADVENTERPRISEK9-M |
-| Version       | 17.15.1                   |
-| Uptime        | 30 minutes                |
+You: Good, show me loopback intefaces on sw1
 
-You: Good, thanks.
+🤖 Agent: **Loopback0 – sw1**
 
-🤖 Agent: You're welcome! If you need anything else, just let me know.
+| Attribute | Value |
+|-----------|-------|
+| **Interface** | Loopback0 |
+| **Link status** | up |
+| **Protocol status** | up |
+| **IP address** | 10.0.0.1/32 |
+| **MTU** | 1514 |
+| **Bandwidth** | 8 000 000 Kbit |
+| **Delay** | 5 000 µs |
+| **Encapsulation** | LOOPBACK |
+| **Last input / output** | never |
+| **Input / output rates** | 0 bps |
+| **Error counters** | all zero (input_errors, output_errors, etc.) |
+
+*Loopback0 is fully operational with a single IPv4 address (10.0.0.1/32) and no traffic or error activity.*
+
+You: check ospf summary on sw2
+
+🤖 Agent: **OSPF Summary – sw2**
+
+| Item | Detail |
+|------|--------|
+| **Process** | OSPF 1 |
+| **Router ID** | 10.0.0.2 |
+| **Start time** | 00:00:33.901 |
+| **Uptime** | 00:25:35.698 |
+| **Reference bandwidth** | 100 Mbps |
+| **Areas** | 1 (BACKBONE 0.0.0.0) – 3 interfaces (Ethernet0/0, Ethernet0/1, Loopback0) |
+| **LSA count** | 2 total (1 router‑LSA, 1 network‑LSA) |
+| **External LSAs** | 0 |
+| **Opaque AS LSAs** | 0 |
+| **SPF executions** | 5 (last run 00:25:07.759 ago) |
+| **Adjacency limits** | 300 (initial/maximum) |
+| **Flood/LSA pacing** | Flood 33 ms, LSA throttle 50 ms, LSA group pacing 240 s |
+| **Authentication** | None |
+| **NSF helpers** | IETF & Cisco enabled |
+| **Key flags** | Supports LLS, opaque LSAs, NSSA, DB‑exchange summary optimization; no area transit capability |
+
+*The router is running OSPF with a single backbone area, no external routes, and a minimal LSA database. SPF has converged 5 times during the 25‑minute uptime.*
 
 You: quit
 Goodbye!
