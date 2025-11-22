@@ -17,7 +17,7 @@ In today's complex network environments, managing and troubleshooting devices ca
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.12 or higher
 - `uv` package manager
 - SSH access to your network devices
 - A Groq API key for AI functionality
@@ -26,56 +26,56 @@ In today's complex network environments, managing and troubleshooting devices ca
 
 1. **Clone the repository and navigate to the project directory**:
 
-    ```bash
-    git clone https://github.com/sydasif/network-automation-agent.git
-    cd network-agent
-    ```
+```bash
+git clone https://github.com/sydasif/network-automation-agent.git
+cd network-agent
+```
 
 2. **Install the required dependencies**:
 
-    ```bash
-    uv sync
-    ```
+```bash
+uv sync
+```
 
 3. **Configure your environment**:
 
-    ```bash
-    cp .env.example .env
-    ```
+```bash
+cp .env.example .env
+```
 
-    Then, add your Groq API key to the newly created `.env` file.
+Then, add your Groq API key to the newly created `.env` file.
 
 4. **Configure and Migrate Your Network Devices**:
 
-   The device inventory is now managed by a SQLite database (`inventory.db`) for improved performance and scalability. To populate it, follow this two-step process:
+The device inventory is now managed by a SQLite database (`inventory.db`) for improved performance and scalability. To populate it, follow this two-step process:
 
-   **Step 1: Configure `hosts.yaml`**
+**Step 1: Configure `hosts.yaml`**
 
-   First, add your network device details to the `hosts.yaml` file. This file is used only for the initial data migration.
+First, add your network device details to the `hosts.yaml` file. This file is used only for the initial data migration.
 
-    ```yaml
-    devices:
-      - name: router-1
-        host: 192.168.1.10
-        username: admin
-        password: password123
-        device_type: cisco_ios
-      - name: switch-1
-        host: 192.168.1.11
-        username: admin
-        password: password123
-        device_type: cisco_ios
-    ```
+```yaml
+devices:
+  - name: sw1
+    host: 192.168.121.101
+    username: admin
+    password_env_var: DEVICE_PASSWORD
+    device_type: cisco_ios
+  - name: sw2
+    host: 192.168.121.102
+    username: admin
+    password_env_var: DEVICE_PASSWORD
+    device_type: cisco_ios
+```
 
-   **Step 2: Run the Migration Script**
+**Step 2: Run the Migration Script**
 
-   Next, run the migration script to create the database and import the devices from your `hosts.yaml` file:
+Next, run the migration script to create the database and import the devices from your `hosts.yaml` file:
 
-    ```bash
-    uv run hosts.py
-    ```
+```bash
+uv run hosts.py
+```
 
-   This will create an `inventory.db` file. Once the migration is complete, the `hosts.yaml` file is no longer used for operations.
+This will create an `inventory.db` file. Once the migration is complete, the `hosts.yaml` file is no longer used for operations.
 
 ## Usage
 
