@@ -21,6 +21,7 @@ dependencies = [
 [tool.ruff]
 line-length = 99
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["graph", "llm", "tools", "utils"]
+[dependency-groups]
+dev = [
+    "ruff>=0.14.6",
+]
