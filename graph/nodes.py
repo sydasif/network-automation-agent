@@ -31,7 +31,7 @@ from langchain_core.messages import (
 
 from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
 from llm.client import create_llm
-from tools.run_command import run_command
+from tools.commands import run_command
 from utils.database import get_db
 from utils.devices import get_all_device_names
 

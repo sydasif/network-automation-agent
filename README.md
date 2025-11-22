@@ -107,7 +107,7 @@ Contains the three core node functions:
 
 Provides a function to create and configure a ChatGroq LLM instance optimized for network automation tasks with deterministic responses.
 
-#### 5. Command Execution Tool (`tools/run_command.py`)
+#### 5. Command Execution Tool (`tools/commands.py`)
 
 A LangChain tool that executes commands on network devices with:
 

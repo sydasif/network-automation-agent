@@ -41,6 +41,7 @@ class Device(Base):
         password_env_var: Name of environment variable containing the password
         device_type: Device type identifier for Netmiko (e.g., 'cisco_ios')
     """
+
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True, index=True)
