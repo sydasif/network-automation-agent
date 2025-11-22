@@ -1,3 +1,10 @@
+"""Module for migrating network device data from YAML to SQLite database.
+
+This module provides functionality to migrate network device configurations
+from a YAML file to a SQLite database. It's used during the initial setup
+process to populate the device inventory database.
+"""
+
 from pathlib import Path
 
 import yaml
@@ -8,6 +15,22 @@ from utils.devices import clear_device_cache
 
 
 def migrate_data():
+    """Migrates device data from hosts.yaml to the SQLite database.
+
+    This function reads device configurations from hosts.yaml, validates
+    the required fields, and adds them to the database. It skips devices
+    that already exist in the database and clears the device cache after
+    successful migration.
+
+    The function handles various error conditions including:
+    - Missing hosts.yaml file
+    - YAML parsing errors
+    - Missing required device fields
+    - Database operations
+
+    This function should be run after configuring the hosts.yaml file to
+    initialize the device inventory database.
+    """
     # Create database tables if they don't exist
     create_db_and_tables()
 

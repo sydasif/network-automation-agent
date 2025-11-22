@@ -2,6 +2,9 @@
 
 This module provides the interactive CLI interface for the network automation agent,
 allowing users to communicate with network devices using natural language commands.
+
+The application uses LangGraph to manage the conversation flow between understanding
+user requests, executing network commands, and responding with formatted results.
 """
 
 import logging

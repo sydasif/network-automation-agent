@@ -1,9 +1,24 @@
 """Defines the node functions for the network automation agent workflow.
 
-This module implements the three main nodes in the LangGraph workflow:
-- understand_node: Parses user input and determines if tools need to be executed
-- execute_node: Executes network commands on specified devices
-- respond_node: Formats and returns results to the user
+This module implements the three main nodes in the LangGraph workflow that
+handle the conversational flow of the network automation agent:
+
+1. understand_node: Analyzes user input and determines whether to execute
+   network commands or respond directly to the user. It uses an LLM to
+   understand intent and generate appropriate system prompts with available
+   device information.
+
+2. execute_node: Processes LLM-generated tool calls by executing the
+   requested network commands on specified devices using the run_command tool.
+   This node handles parallel execution and formats results appropriately.
+
+3. respond_node: Generates the final response to the user, either from
+   command execution results or as a direct response to the user's input.
+   This node synthesizes the information and formats it according to the
+   configured response prompt.
+
+The nodes work together to create a seamless experience where users can
+interact with network devices using natural language.
 """
 
 from typing import Any
@@ -20,6 +35,7 @@ from tools.run_command import run_command
 from utils.database import get_db
 from utils.devices import get_all_device_names
 
+# Initialize the LLM and bind the run_command tool for use in the understand node
 llm = create_llm()
 llm_with_tools = llm.bind_tools([run_command])
 
@@ -27,15 +43,20 @@ llm_with_tools = llm.bind_tools([run_command])
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """Processes user input and determines if network commands need to be executed.
 
-    This node analyzes the conversation history and creates an appropriate
-    system message with available devices. It then uses the LLM to decide
-    whether to call tools (execute commands) or respond directly to the user.
+    Analyzes the conversation history, retrieves available device names from the
+    database, and constructs a system message that includes this information.
+    Then uses the LLM to interpret the user's intent and decides whether to
+    call tools (execute commands) or respond directly to the user.
+
+    Memory management is implemented using message trimming to keep within
+    the LLM's context window while preserving conversation context. The
+    original message history is maintained in the LangGraph checkpoint system.
 
     Args:
-        state: The current state of the conversation containing messages.
+        state: Current conversation state containing message history
 
     Returns:
-        Updated state with new messages.
+        Updated state with new messages from the LLM decision
     """
     messages = state.get("messages", [])
 
@@ -72,15 +93,19 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
 def execute_node(state: dict[str, Any]) -> dict[str, Any]:
     """Executes network commands on specified devices based on tool calls.
 
-    This node processes tool calls from the LLM, specifically the run_command tool,
-    and executes the requested commands on the specified devices. It handles
-    the parallel execution of commands and formats the results as tool messages.
+    Processes tool calls from the LLM's understanding phase. Specifically handles
+    the 'run_command' tool by extracting arguments and invoking the appropriate
+    command execution. Results are formatted as tool messages that can be
+    consumed by the response node.
+
+    Parallel execution is managed by the run_command tool itself, allowing
+    multiple network commands to be executed concurrently when possible.
 
     Args:
-        state: The current state containing messages with tool calls
+        state: Current state containing messages with tool calls
 
     Returns:
-        Updated state with tool response messages.
+        Updated state with tool response messages formatted as ToolMessage objects
     """
     messages = state["messages"]
     last = messages[-1]
@@ -103,15 +128,16 @@ def execute_node(state: dict[str, Any]) -> dict[str, Any]:
 def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     """Formats and returns the final response to the user.
 
-    This node synthesizes the results from command execution or provides
-    a direct response if no tools were needed. It creates a system message
-    that guides the LLM to format the output appropriately.
+    Synthesizes the results from command execution or provides a direct response
+    if no tools were needed. Uses the configured response prompt to guide the
+    LLM in formatting output appropriately, whether as structured data, tables,
+    or natural language responses.
 
     Args:
-        state: The current state containing messages.
+        state: Current state containing messages including tool responses
 
     Returns:
-        Updated state with the final response message.
+        Updated state with the final AI response message formatted for the user
     """
     # For the response node, we might want the last few messages to contextually answer
     messages = state["messages"]

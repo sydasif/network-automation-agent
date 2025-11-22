@@ -1,4 +1,15 @@
-"""This module contains the system prompts for the network automation agent."""
+"""System prompts for the network automation agent.
+
+This module contains the system prompts used by the LLM to guide its behavior
+in different phases of the conversation workflow. These prompts are essential
+for proper command interpretation, execution, and response formatting.
+
+The prompts are designed to ensure the LLM:
+- Understands its role as a network automation assistant
+- Checks device types before issuing commands
+- Provides structured responses when possible
+- Formats output appropriately for the user
+"""
 
 UNDERSTAND_PROMPT = """
 You are a network automation assistant.

@@ -3,6 +3,10 @@
 This module provides functionality to initialize and configure the LLM client
 using the Groq API. It handles API key management and creates the appropriate
 language model instance for the agent.
+
+The module is designed specifically for network automation tasks, where
+deterministic and accurate responses are crucial for proper command
+interpretation and device management.
 """
 
 import os
@@ -13,9 +17,13 @@ from langchain_groq import ChatGroq
 def create_llm(api_key: str | None = None):
     """Creates and configures a ChatGroq LLM instance for the network agent.
 
-    This function initializes a ChatGroq language model with a temperature of 0
-    to ensure consistent and deterministic responses for network automation tasks.
-    It retrieves the API key from the provided parameter or environment variable.
+    Initializes a ChatGroq language model optimized for network automation tasks.
+    The temperature is set to a low value (0.2) to ensure consistent and
+    deterministic responses, which is crucial for correctly interpreting
+    commands and device names in an automation context.
+
+    The function supports both direct API key parameter and environment
+    variable configuration for flexibility in different deployment scenarios.
 
     Args:
         api_key: Optional API key for Groq. If not provided, the function

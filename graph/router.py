@@ -3,6 +3,14 @@
 This module creates a LangGraph-based workflow that handles the conversation
 flow between understanding user requests, executing network commands, and
 responding to the user with formatted results.
+
+The workflow implements a three-node architecture:
+- Understand: Parses user intent and determines if tools need to be executed
+- Execute: Runs network commands on specified devices
+- Respond: Formats and delivers results to the user
+
+The state management uses LangGraph's built-in checkpointing to maintain
+conversation history across interactions.
 """
 
 from typing import Annotated, Any, Literal, TypedDict
@@ -17,6 +25,9 @@ from graph.nodes import execute_node, respond_node, understand_node
 class State(TypedDict):
     """Defines the state structure for the LangGraph workflow.
 
+    This state maintains the conversation context and execution results
+    throughout the workflow lifecycle.
+
     Attributes:
         messages: List of conversation messages between user and agent
         results: Dictionary to store execution results and metadata
@@ -27,16 +38,17 @@ class State(TypedDict):
 
 
 def should_execute(state: State) -> Literal["execute", "respond"]:
-    """Determines the next step in the workflow.
+    """Determines the next step in the workflow based on tool calls.
 
-    If the last message in the state has tool calls, it routes to the 'execute' node.
-    Otherwise, it routes to the 'respond' node.
+    Inspects the last message to see if it contains tool calls that need
+    to be executed. If tool calls are present, routes to the 'execute' node.
+    Otherwise, proceeds directly to the 'respond' node.
 
     Args:
-        state: The current state of the workflow.
+        state: The current state containing conversation messages.
 
     Returns:
-        'execute' or 'respond'
+        Literal string indicating whether to 'execute' tools or 'respond' directly.
     """
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
@@ -47,13 +59,12 @@ def should_execute(state: State) -> Literal["execute", "respond"]:
 def create_graph():
     """Creates and configures the LangGraph workflow for the network agent.
 
-    The workflow consists of three main nodes:
-    1. 'understand' - Parses user input and determines if tools need to be executed
-    2. 'execute' - Runs network commands on the specified devices
-    3. 'respond' - Formats and returns results to the user
+    Sets up the three-node state machine with appropriate routing logic.
+    The workflow begins at the 'understand' node where user input is processed,
+    then conditionally routes to 'execute' if commands need to be run on devices,
+    and finally to 'respond' to format and return the results to the user.
 
-    The workflow starts at the 'understand' node and conditionally routes
-    to either 'execute' (if tools need to be executed) or 'respond'.
+    The workflow includes memory checkpointing to maintain conversation history.
 
     Returns:
         A compiled LangGraph workflow instance ready to process conversations.
