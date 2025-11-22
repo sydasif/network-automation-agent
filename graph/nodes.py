@@ -52,6 +52,7 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
 
     response = llm_with_tools.invoke(full_messages)
 
+    # Return the complete message history to ensure state is maintained
     return {"messages": messages + [response]}
 
 

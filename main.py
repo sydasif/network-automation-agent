@@ -25,9 +25,22 @@ def chat_loop(app) -> None:
             if not user_input:
                 continue
 
-            messages = [HumanMessage(content=user_input)]
-            result = app.invoke({"messages": messages, "results": {}}, config)
+            # Get the current state with conversation history
+            try:
+                # Get current state including message history
+                current_state = app.get_state(config)
+                current_messages = current_state.values.get("messages", [])
+            except:
+                # If no state exists yet, start with empty messages
+                current_messages = []
 
+            # Add the new user message
+            new_messages = current_messages + [HumanMessage(content=user_input)]
+
+            # Invoke the app with the complete message history
+            result = app.invoke({"messages": new_messages, "results": {}}, config)
+
+            # Update the state with the complete conversation history
             final_message = result["messages"][-1]
             if isinstance(final_message, AIMessage):
                 response_text = final_message.content
