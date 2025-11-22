@@ -1,77 +1,26 @@
-"""Defines the node functions for the network automation agent workflow.
-
-This module implements the three main nodes in the LangGraph workflow that
-handle the conversational flow of the network automation agent:
-
-1. understand_node: Analyzes user input and determines whether to execute
-   network commands or respond directly to the user. It uses an LLM to
-   understand intent and generate appropriate system prompts with available
-   device information.
-
-2. execute_node: Processes LLM-generated tool calls by executing the
-   requested network commands on specified devices using the run_command tool.
-   This node handles parallel execution and formats results appropriately.
-
-3. respond_node: Generates the final response to the user, either from
-   command execution results or as a direct response to the user's input.
-   This node synthesizes the information and formats it according to the
-   configured response prompt.
-
-The nodes work together to create a seamless experience where users can
-interact with network devices using natural language.
-"""
+"""Node functions for the LangGraph workflow."""
 
 from typing import Any
-
-from langchain_core.messages import (
-    SystemMessage,
-    ToolMessage,
-    trim_messages,
-)
+from langchain_core.messages import SystemMessage, ToolMessage, trim_messages
+from langgraph.types import interrupt  # <--- THE BUILT-IN HITL FEATURE
 
 from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
 from llm.client import create_llm
-from tools.commands import run_command
+from tools.commands import show_command, config_command
 from utils.database import get_db
 from utils.devices import get_all_device_names
 
-# Initialize the LLM and bind the run_command tool for use in the understand node
 llm = create_llm()
-llm_with_tools = llm.bind_tools([run_command])
-
+llm_with_tools = llm.bind_tools([show_command, config_command])
 
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Processes user input and determines if network commands need to be executed.
-
-    Analyzes the conversation history, retrieves available device names from the
-    database, and constructs a system message that includes this information.
-    Then uses the LLM to interpret the user's intent and decides whether to
-    call tools (execute commands) or respond directly to the user.
-
-    Memory management is implemented using message trimming to keep within
-    the LLM's context window while preserving conversation context. The
-    original message history is maintained in the LangGraph checkpoint system.
-
-    Args:
-        state: Current conversation state containing message history
-
-    Returns:
-        Updated state with new messages from the LLM decision
-    """
+    """Analyzes user intent and selects tools."""
     messages = state.get("messages", [])
 
-    # --- KISS MEMORY MANAGEMENT ---
-    # We trim messages strictly for the LLM context window here.
-    # The full history is still safely stored in the Checkpointer (database).
-    # Using len as token counter since transformers might not be available
+    # Simple context trimming
     trimmed_messages = trim_messages(
-        messages,
-        max_tokens=2000,  # Adjust based on your model's limit
-        strategy="last",
-        token_counter=len,  # Use len as simple fallback, or install transformers
-        start_on="human",
-        end_on=("human", "ai"),
-        include_system=False,  # We will add system prompt manually below
+        messages, max_tokens=2000, strategy="last", token_counter=len,
+        start_on="human", end_on=("human", "ai"), include_system=False
     )
 
     with get_db() as db:
@@ -81,71 +30,69 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))
     )
 
-    # Reconstruct: System Prompt + Trimmed History
-    full_messages = [system_msg] + trimmed_messages
-
-    response = llm_with_tools.invoke(full_messages)
-
-    # Because we used add_messages in router.py, we just return the NEW message
+    response = llm_with_tools.invoke([system_msg] + trimmed_messages)
     return {"messages": [response]}
 
-
-def execute_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Executes network commands on specified devices based on tool calls.
-
-    Processes tool calls from the LLM's understanding phase. Specifically handles
-    the 'run_command' tool by extracting arguments and invoking the appropriate
-    command execution. Results are formatted as tool messages that can be
-    consumed by the response node.
-
-    Parallel execution is managed by the run_command tool itself, allowing
-    multiple network commands to be executed concurrently when possible.
-
-    Args:
-        state: Current state containing messages with tool calls
-
-    Returns:
-        Updated state with tool response messages formatted as ToolMessage objects
-    """
+def execute_read_node(state: dict[str, Any]) -> dict[str, Any]:
+    """Executes read-only commands (show_command)."""
     messages = state["messages"]
-    last = messages[-1]
-
+    last_msg = messages[-1]
     tool_results = []
-    if hasattr(last, "tool_calls"):
-        for tool_call in last.tool_calls:
-            if tool_call["name"] == "run_command":
-                result = run_command.invoke(tool_call["args"])
-                tool_results.append({"tool_call_id": tool_call["id"], "output": result})
 
-    tool_messages = [
+    if hasattr(last_msg, "tool_calls"):
+        for tool_call in last_msg.tool_calls:
+            if tool_call["name"] == "show_command":
+                result = show_command.invoke(tool_call["args"])
+                tool_results.append({
+                    "tool_call_id": tool_call["id"],
+                    "output": result
+                })
+
+    return {"messages": [
         ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
         for tr in tool_results
-    ]
+    ]}
 
-    return {"messages": tool_messages}
+def execute_write_node(state: dict[str, Any]) -> dict[str, Any]:
+    """Executes configuration commands with NATIVE INTERRUPT."""
+    messages = state["messages"]
+    last_msg = messages[-1]
+    tool_results = []
 
+    if hasattr(last_msg, "tool_calls"):
+        for tool_call in last_msg.tool_calls:
+            if tool_call["name"] == "config_command":
+
+                # --- BUILT-IN HITL MIDDLEWARE ---
+                # 1. Pause execution and send payload to client
+                # 2. Wait for Command(resume="yes/no")
+                # 3. "decision" variable gets the value when resumed
+                decision = interrupt({
+                    "type": "approval_request",
+                    "tool_call": tool_call
+                })
+
+                if decision == "approved":
+                    # Execute if approved
+                    result = config_command.invoke(tool_call["args"])
+                    output = result
+                else:
+                    # Handle rejection
+                    output = "User denied the configuration request."
+
+                tool_results.append({
+                    "tool_call_id": tool_call["id"],
+                    "output": output
+                })
+
+    return {"messages": [
+        ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
+        for tr in tool_results
+    ]}
 
 def respond_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Formats and returns the final response to the user.
-
-    Synthesizes the results from command execution or provides a direct response
-    if no tools were needed. Uses the configured response prompt to guide the
-    LLM in formatting output appropriately, whether as structured data, tables,
-    or natural language responses.
-
-    Args:
-        state: Current state containing messages including tool responses
-
-    Returns:
-        Updated state with the final AI response message formatted for the user
-    """
-    # For the response node, we might want the last few messages to contextually answer
+    """Formats the final response."""
     messages = state["messages"]
-
-    # Optional: Trim here too if output is huge, but usually safe to pass last few
     synthesis_prompt = SystemMessage(content=RESPOND_PROMPT)
-
-    # We pass the full (or trimmed) history + the instruction to summarize
     response = llm.invoke(messages + [synthesis_prompt])
-
-    return {"messages": [response]}  # Returns only new message
+    return {"messages": [response]}
