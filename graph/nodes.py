@@ -9,10 +9,9 @@ This module implements the three main nodes in the LangGraph workflow:
 from typing import Any
 
 from langchain_core.messages import (
-    BaseMessage,
-    HumanMessage,
     SystemMessage,
     ToolMessage,
+    trim_messages,
 )
 
 from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
@@ -38,7 +37,21 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Updated state with new messages.
     """
-    messages: list[BaseMessage] = state.get("messages", [])
+    messages = state.get("messages", [])
+
+    # --- KISS MEMORY MANAGEMENT ---
+    # We trim messages strictly for the LLM context window here.
+    # The full history is still safely stored in the Checkpointer (database).
+    # Using len as token counter since transformers might not be available
+    trimmed_messages = trim_messages(
+        messages,
+        max_tokens=2000,  # Adjust based on your model's limit
+        strategy="last",
+        token_counter=len,  # Use len as simple fallback, or install transformers
+        start_on="human",
+        end_on=("human", "ai"),
+        include_system=False,  # We will add system prompt manually below
+    )
 
     with get_db() as db:
         device_names = get_all_device_names(db)
@@ -47,13 +60,13 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))
     )
 
-    converted_messages = [HumanMessage(content=m) if isinstance(m, str) else m for m in messages]
-    full_messages = [system_msg] + converted_messages
+    # Reconstruct: System Prompt + Trimmed History
+    full_messages = [system_msg] + trimmed_messages
 
     response = llm_with_tools.invoke(full_messages)
 
-    # Return the complete message history to ensure state is maintained
-    return {"messages": messages + [response]}
+    # Because we used add_messages in router.py, we just return the NEW message
+    return {"messages": [response]}
 
 
 def execute_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -84,7 +97,7 @@ def execute_node(state: dict[str, Any]) -> dict[str, Any]:
         for tr in tool_results
     ]
 
-    return {"messages": messages + tool_messages}
+    return {"messages": tool_messages}
 
 
 def respond_node(state: dict[str, Any]) -> dict[str, Any]:
@@ -100,10 +113,13 @@ def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Updated state with the final response message.
     """
+    # For the response node, we might want the last few messages to contextually answer
     messages = state["messages"]
 
+    # Optional: Trim here too if output is huge, but usually safe to pass last few
     synthesis_prompt = SystemMessage(content=RESPOND_PROMPT)
 
+    # We pass the full (or trimmed) history + the instruction to summarize
     response = llm.invoke(messages + [synthesis_prompt])
 
-    return {"messages": messages + [response]}
+    return {"messages": [response]}  # Returns only new message

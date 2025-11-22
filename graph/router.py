@@ -5,11 +5,11 @@ flow between understanding user requests, executing network commands, and
 responding to the user with formatted results.
 """
 
-from typing import Any, Literal, TypedDict
+from typing import Annotated, Any, Literal, TypedDict
 
-from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
+from langgraph.graph.message import add_messages
 
 from graph.nodes import execute_node, respond_node, understand_node
 
@@ -22,7 +22,7 @@ class State(TypedDict):
         results: Dictionary to store execution results and metadata
     """
 
-    messages: list[BaseMessage]
+    messages: Annotated[list, add_messages]
     results: dict[str, Any]
 
 
