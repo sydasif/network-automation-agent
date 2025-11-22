@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://i.imgur.com/your-logo-image.png" alt="Network AI Agent Logo" width="150"/>
+<img src="https://github.com/sydasif/sydasif.github.io/blob/main/assets/img/favicons/favicon-96x96.png" alt="Network AI Agent Logo" width="150"/>
 
 # Network AI Agent
 
