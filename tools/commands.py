@@ -9,16 +9,16 @@ import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Union, List
+from typing import Union, List
 
 from langchain_core.tools import tool
 from netmiko import ConnectHandler
-from netmiko.exceptions import NetmikoAuthenticationException, NetmikoTimeoutException
 
 from utils.database import Device, get_db
 from utils.devices import get_all_device_names
 
 logger = logging.getLogger(__name__)
+
 
 def _get_connection_params(device_name: str) -> dict:
     """Helper: Retrieves connection parameters from DB (DRY)."""
@@ -36,8 +36,9 @@ def _get_connection_params(device_name: str) -> dict:
             "host": dev_conf.host,
             "username": dev_conf.username,
             "password": password,
-            "timeout": 30
+            "timeout": 30,
         }
+
 
 @tool
 def show_command(device: Union[str, list[str]], command: str) -> str:
@@ -79,10 +80,7 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
             dev, res = future.result()
             results[dev] = res
 
-    return json.dumps({
-        "command": command,
-        "devices": results
-    }, indent=2)
+    return json.dumps({"command": command, "devices": results}, indent=2)
 
 
 @tool
@@ -101,11 +99,7 @@ def config_command(device: str, configs: List[str]) -> str:
             # send_config_set handles 'conf t' and 'end'
             output = conn.send_config_set(configs)
             conn.save_config()
-            return json.dumps({
-                "device": device,
-                "status": "configured",
-                "output": output
-            })
+            return json.dumps({"device": device, "status": "configured", "output": output})
     except Exception as e:
         logger.error(f"Config error on {device}: {e}")
         return json.dumps({"success": False, "error": str(e)})

@@ -5,13 +5,13 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
-from graph.nodes import (
-    understand_node, execute_read_node, execute_write_node, respond_node
-)
+from graph.nodes import understand_node, execute_read_node, execute_write_node, respond_node
+
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     results: dict[str, Any]
+
 
 def route_tools(state: State) -> Literal["execute_read", "execute_write", "respond"]:
     last_message = state["messages"][-1]
@@ -20,6 +20,7 @@ def route_tools(state: State) -> Literal["execute_read", "execute_write", "respo
 
     tool_name = last_message.tool_calls[0]["name"]
     return "execute_write" if tool_name == "config_command" else "execute_read"
+
 
 def create_graph():
     workflow = StateGraph(State)

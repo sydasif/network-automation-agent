@@ -13,14 +13,20 @@ from utils.devices import get_all_device_names
 llm = create_llm()
 llm_with_tools = llm.bind_tools([show_command, config_command])
 
+
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """Analyzes user intent and selects tools."""
     messages = state.get("messages", [])
 
     # Simple context trimming
     trimmed_messages = trim_messages(
-        messages, max_tokens=2000, strategy="last", token_counter=len,
-        start_on="human", end_on=("human", "ai"), include_system=False
+        messages,
+        max_tokens=2000,
+        strategy="last",
+        token_counter=len,
+        start_on="human",
+        end_on=("human", "ai"),
+        include_system=False,
     )
 
     with get_db() as db:
@@ -33,6 +39,7 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     response = llm_with_tools.invoke([system_msg] + trimmed_messages)
     return {"messages": [response]}
 
+
 def execute_read_node(state: dict[str, Any]) -> dict[str, Any]:
     """Executes read-only commands (show_command)."""
     messages = state["messages"]
@@ -43,15 +50,15 @@ def execute_read_node(state: dict[str, Any]) -> dict[str, Any]:
         for tool_call in last_msg.tool_calls:
             if tool_call["name"] == "show_command":
                 result = show_command.invoke(tool_call["args"])
-                tool_results.append({
-                    "tool_call_id": tool_call["id"],
-                    "output": result
-                })
+                tool_results.append({"tool_call_id": tool_call["id"], "output": result})
 
-    return {"messages": [
-        ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
-        for tr in tool_results
-    ]}
+    return {
+        "messages": [
+            ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
+            for tr in tool_results
+        ]
+    }
+
 
 def execute_write_node(state: dict[str, Any]) -> dict[str, Any]:
     """Executes configuration commands with NATIVE INTERRUPT."""
@@ -62,15 +69,11 @@ def execute_write_node(state: dict[str, Any]) -> dict[str, Any]:
     if hasattr(last_msg, "tool_calls"):
         for tool_call in last_msg.tool_calls:
             if tool_call["name"] == "config_command":
-
                 # --- BUILT-IN HITL MIDDLEWARE ---
                 # 1. Pause execution and send payload to client
                 # 2. Wait for Command(resume="yes/no")
                 # 3. "decision" variable gets the value when resumed
-                decision = interrupt({
-                    "type": "approval_request",
-                    "tool_call": tool_call
-                })
+                decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
                 if decision == "approved":
                     # Execute if approved
@@ -80,15 +83,15 @@ def execute_write_node(state: dict[str, Any]) -> dict[str, Any]:
                     # Handle rejection
                     output = "User denied the configuration request."
 
-                tool_results.append({
-                    "tool_call_id": tool_call["id"],
-                    "output": output
-                })
+                tool_results.append({"tool_call_id": tool_call["id"], "output": output})
 
-    return {"messages": [
-        ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
-        for tr in tool_results
-    ]}
+    return {
+        "messages": [
+            ToolMessage(content=str(tr["output"]), tool_call_id=tr["tool_call_id"])
+            for tr in tool_results
+        ]
+    }
+
 
 def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     """Formats the final response."""
