@@ -1,4 +1,3 @@
-import logging
 import uuid
 
 import chainlit as cl
@@ -6,10 +5,6 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
 from graph.router import create_graph
-
-# Setup minimal logging
-logging.basicConfig(level=logging.WARNING)
-logger = logging.getLogger(__name__)
 
 # Initialize the graph once at startup
 graph = create_graph()
@@ -90,7 +85,6 @@ async def on_message(message: cl.Message):
         tool_args = tool_call.get("args", {})
 
         # Show the "Approve/Deny" buttons
-        # We keep the 'payload' here because your version requires it
         res = await cl.AskActionMessage(
             content=f"⚠️ **Approval Required**\n\nThe agent wants to execute:\n\n**Tool:** `{tool_name}`\n**Args:** `{tool_args}`",
             actions=[
@@ -112,8 +106,10 @@ async def on_message(message: cl.Message):
         ).send()
 
         # 4. Determine Resume Value
-        # The value is nested in the payload, not directly in res
-        if res and res.get("payload", {}).get("value") == "approved":
+        # FIX: Check the 'name' attribute which is stable.
+        print(f"DEBUG: Chainlit Action Response: {res}")
+
+        if res and res.get("name") == "approve":
             resume_value = "approved"
         else:
             resume_value = "denied"
