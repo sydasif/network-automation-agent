@@ -1,23 +1,22 @@
-from typing import Literal, TypedDict, Annotated
+from typing import Annotated, Literal, TypedDict
+
+from langchain_core.messages import ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from langchain_core.messages import ToolMessage
 
 # Import the new nodes
 from graph.nodes import (
-    understand_node,
     approval_node,
     read_tool_node,
-    write_tool_node,
     respond_node,
+    understand_node,
+    write_tool_node,
 )
 
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-    # 'results' is no longer strictly needed as ToolNode stores results in 'messages'
-    # but you can keep it if you have other uses.
 
 
 def route_tools(state: State) -> Literal["execute_read", "approval", "respond"]:
@@ -45,6 +44,7 @@ def route_approval(state: State) -> Literal["execute_write", "respond"]:
         return "respond"
 
     # Otherwise (if it's still the AIMessage), we APPROVED it.
+    # The graph will proceed to execute the tool call in the AIMessage.
     return "execute_write"
 
 

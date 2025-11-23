@@ -9,6 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# Chainlit files
+.chainlit/
+
 net_lab/
 repomix*
 .env

@@ -17,6 +17,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "cachetools>=5.3.2",
     "langmem>=0.0.30",
+    "chainlit>=2.9.2",
 ]
 
 [tool.ruff]
