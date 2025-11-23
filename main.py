@@ -8,7 +8,17 @@ from graph.router import create_graph
 
 
 def chat_loop(app) -> None:
+    """Runs the main chat interaction loop for the Network AI Agent.
+
+    This function manages the conversation flow between the user and the agent
+    in a continuous loop until the user exits. It handles user input, invokes
+    the agent, processes any required human approvals, and displays responses.
+
+    Args:
+        app: The compiled LangGraph workflow instance to interact with.
+    """
     session_id = str(uuid.uuid4())
+    # Create a unique session configuration with thread ID for conversation history
     config = {"configurable": {"thread_id": f"session-{session_id}"}}
 
     print("🤖 Network AI Agent Ready! (Type 'quit' to exit)\n")
@@ -22,7 +32,7 @@ def chat_loop(app) -> None:
             if not user_input:
                 continue
 
-            # Initial invocation
+            # Initial invocation - send user input to the workflow
             result = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
 
             # --- NATIVE HITL HANDLING ---
@@ -30,6 +40,7 @@ def chat_loop(app) -> None:
             # We check the snapshot to see if we are in an interrupted state.
             snapshot = app.get_state(config)
 
+            # Process any pending interrupts (configuration changes requiring approval)
             while snapshot.tasks and snapshot.tasks[0].interrupts:
                 # Get the payload passed to interrupt() inside the node
                 interrupt_value = snapshot.tasks[0].interrupts[0].value
@@ -49,7 +60,7 @@ def chat_loop(app) -> None:
                 # Update snapshot to check if there are MORE interrupts or if we are done
                 snapshot = app.get_state(config)
 
-            # Final Response
+            # Display the final response to the user
             if "messages" in result and result["messages"]:
                 print(f"\n🤖 Agent: {result['messages'][-1].content}\n")
 

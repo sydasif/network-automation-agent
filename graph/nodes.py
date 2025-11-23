@@ -15,18 +15,31 @@ llm_with_tools = llm.bind_tools([show_command, config_command])
 
 
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Analyzes user intent and selects tools."""
+    """Analyzes user intent and selects appropriate tools based on context.
+
+    This node processes the conversation history, trims the context to avoid
+    exceeding token limits, retrieves available device names from the database,
+    and invokes the LLM to determine which tools to call based on the user's request.
+
+    Args:
+        state: Current state containing messages and results.
+
+    Returns:
+        Dictionary with updated messages including tool calls or direct responses.
+    """
     messages = state.get("messages", [])
 
-    # Simple context trimming
+    # Trim context to last 2000 tokens to prevent exceeding model token limits
+    # Uses "last" strategy to keep most recent messages, starting from human input
+    # and ending with either human or AI messages, excluding system messages
     trimmed_messages = trim_messages(
         messages,
         max_tokens=2000,
         strategy="last",
-        token_counter=len,
-        start_on="human",
-        end_on=("human", "ai"),
-        include_system=False,
+        token_counter=len,  # Using len as a simple character counter
+        start_on="human",   # Start trimming from human messages
+        end_on=("human", "ai"),  # End trimming at human or AI messages
+        include_system=False,    # Exclude system messages from token count
     )
 
     with get_db() as db:
@@ -41,7 +54,18 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def execute_read_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Executes read-only commands (show_command)."""
+    """Executes read-only commands (show_command) without requiring approval.
+
+    This node processes tool calls for read-only operations such as show commands
+    on network devices. It executes the commands and returns the results without
+    requiring human intervention.
+
+    Args:
+        state: Current state containing messages and results.
+
+    Returns:
+        Dictionary with ToolMessage responses containing the command results.
+    """
     messages = state["messages"]
     last_msg = messages[-1]
     tool_results = []
@@ -61,7 +85,20 @@ def execute_read_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def execute_write_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Executes configuration commands with NATIVE INTERRUPT."""
+    """Executes configuration commands that require human approval.
+
+    This node handles configuration changes on network devices. It implements
+    a human-in-the-loop (HITL) workflow where configuration commands are paused
+    for user approval before execution. The node waits for a resume command
+    indicating whether to proceed with the changes or deny them.
+
+    Args:
+        state: Current state containing messages and results.
+
+    Returns:
+        Dictionary with ToolMessage responses containing the command results
+        or approval denial message.
+    """
     messages = state["messages"]
     last_msg = messages[-1]
     tool_results = []
@@ -94,7 +131,18 @@ def execute_write_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def respond_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Formats the final response."""
+    """Formats and generates the final response to the user.
+
+    This node takes the processed results from previous nodes and generates
+    a human-readable response for the user. It uses the LLM to synthesize
+    the information and present it in a clear, concise format.
+
+    Args:
+        state: Current state containing messages and results.
+
+    Returns:
+        Dictionary with the final response message to be displayed to the user.
+    """
     messages = state["messages"]
     synthesis_prompt = SystemMessage(content=RESPOND_PROMPT)
     response = llm.invoke(messages + [synthesis_prompt])

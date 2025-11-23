@@ -1,4 +1,8 @@
-"""System prompts for the network automation agent."""
+"""System prompts for the network automation agent.
+
+This module contains prompt templates used by the LangGraph workflow
+to guide the LLM's behavior during different phases of the conversation.
+"""
 
 UNDERSTAND_PROMPT = """
 You are a network automation assistant.

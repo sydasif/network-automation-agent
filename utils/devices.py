@@ -27,11 +27,11 @@ def get_device_by_name(db: Session, device_name: str) -> Device | None:
     are unique in the database, this will return at most one device.
 
     Args:
-        db: The database session to use for the query
-        device_name: The unique name identifier of the device to retrieve
+        db: The database session to use for the query.
+        device_name: The unique name identifier of the device to retrieve.
 
     Returns:
-        The Device object if found in the database, otherwise None
+        The Device object if found in the database, otherwise None.
     """
     return db.query(Device).filter(Device.name == device_name).first()
 
@@ -45,10 +45,10 @@ def get_all_device_names(db: Session) -> List[str]:
     to ensure data freshness when devices are added or removed.
 
     Args:
-        db: The database session to use for the query
+        db: The database session to use for the query.
 
     Returns:
-        A list containing the names of all devices in the inventory
+        A list containing the names of all devices in the inventory.
     """
     device_names = [device.name for device in db.query(Device.name).all()]
     return device_names
@@ -61,5 +61,6 @@ def clear_device_cache():
     called whenever the device inventory in the database is modified (added,
     updated, or removed) to ensure the cache reflects the current database state.
     """
+    # Clear the TTL cache to force fresh data retrieval on next call
     _device_names_cache.clear()
     print("Device cache cleared.")

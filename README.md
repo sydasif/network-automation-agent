@@ -26,6 +26,7 @@ The Network AI Agent is a smart, intuitive solution for network automation. By l
 - **📊 Structured Output**: Receive beautifully formatted output for easy readability.
 - **🔗 Workflow Management**: Manage complex network workflows with a powerful state machine.
 - **🔒 Secure Device Access**: Ensure secure device communication with SSH connectivity.
+- **👥 Human-in-the-Loop**: Configuration changes require explicit approval for safety.
 
 ---
 
@@ -64,7 +65,17 @@ Get up and running with the Network AI Agent in a few simple steps.
     Then, add your Groq API key to the newly created `.env` file.
 
 4. **Configure and Migrate Network Devices**:
-    The device inventory is managed by a SQLite database (`inventory.db`). To populate it, first add your network device details to the `hosts.yaml` file, then run the migration script:
+    The device inventory is managed by a SQLite database (`inventory.db`). To populate it:
+
+    a. Create a `hosts.yaml` file using the example:
+
+    ```bash
+    cp hosts.example.yaml hosts.yaml
+    ```
+
+    b. Edit `hosts.yaml` with your device details
+
+    c. Run the migration script:
 
     ```bash
     uv run hosts.py
@@ -87,6 +98,7 @@ You can then enter commands in natural language, such as:
 - "Show me the version of router-1"
 - "Show interfaces on switch-1"
 - "Show version on all devices"
+- "Configure interface eth0/1 on sw1 to be in vlan 100" (requires approval)
 
 ---
 
@@ -98,21 +110,20 @@ Here's a snapshot of the Network AI Agent in action:
 <summary>Click to see the full usage example</summary>
 
 ```bash
-❯ python main.py
 🤖 Network AI Agent Ready! (Type 'quit' to exit)
 
 You: Hi, what you can do?
 
-🤖 Agent: Sure! Here’s a quick snapshot of what I can help you with:
+🤖 Agent: Sure! Here's a quick snapshot of what I can help you with:
 
-| What I can do | How I’ll help |
+| What I can do | How I'll help |
 |---------------|---------------|
 | **Run show commands** | Execute `show` commands (e.g., `show version`, `show interfaces`, `show running-config`) on your switches (`sw1`, `sw2`). |
-| **Apply configuration changes** | Use `config_command` to push config updates (interfaces, VLANs, routing, etc.). I’ll confirm the exact changes before sending them to the device. |
-| **Verify device type** | I’ll always check the device type first to avoid mis‑commands. |
+| **Apply configuration changes** | Use `config_command` to push config updates (interfaces, VLANs, routing, etc.). I'll confirm the exact changes before sending them to the device. |
+| **Verify device type** | I'll always check the device type first to avoid mis‑commands. |
 | **Answer questions** | Explain network concepts, troubleshoot common issues, or walk you through best practices. |
 
-Just let me know what you’d like to do—whether it’s a quick status check or a configuration tweak—and I’ll take care of it!
+Just let me know what you'd like to do—whether it's a quick status check or a configuration tweak—and I'll take care of it!
 
 You: Check vlans on all device
 
@@ -165,7 +176,7 @@ Goodbye!
 The agent is built on a `LangGraph`-based state machine with three main nodes:
 
 1. **Understand**: Parses the user's intent to extract device names and commands.
-2. **Execute**: Runs the network commands on the specified devices.
+2. **Execute**: Runs the network commands on the specified devices (with approval for configuration changes).
 3. **Respond**: Formats and returns the results to the user.
 
 <div align="center">
