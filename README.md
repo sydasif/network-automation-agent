@@ -95,10 +95,10 @@ uv run main.py
 
 You can then enter commands in natural language, such as:
 
-- "Show me the version of router-1"
-- "Show interfaces on switch-1"
-- "Show version on all devices"
-- "Set interface eth0/1 on sw1 to be in vlan 100" (requires approval)
+- `Show me the version of router-1`
+- `Show interfaces on switch-1`
+- `Show version on all devices`
+- `Set interface eth0/1 on sw1 to be in vlan 100` (requires approval)
 
 > Use config, add, delete, set, update and remove words for configuration changes
 
