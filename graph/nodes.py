@@ -1,11 +1,12 @@
 from typing import Any
+
 from langchain_core.messages import SystemMessage, ToolMessage, trim_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
 from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
 from llm.client import create_llm
-from tools.commands import show_command, config_command
+from tools.commands import config_command, show_command
 from utils.database import get_db
 from utils.devices import get_all_device_names
 
@@ -13,9 +14,8 @@ llm = create_llm()
 # Bind tools so the LLM knows they exist
 llm_with_tools = llm.bind_tools([show_command, config_command])
 
-# --- 1. Define Native Tool Nodes ---
+# --- NATIVE TOOL NODES ---
 # These replace your custom execute functions.
-# ToolNode automatically handles parsing, execution, and error catching.
 read_tool_node = ToolNode([show_command])
 write_tool_node = ToolNode([config_command])
 
@@ -59,12 +59,11 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
     if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
         return None
 
-    # We only interrupt for the first tool call (simplification)
+    # We only interrupt for the first tool call
     tool_call = last_msg.tool_calls[0]
 
     # --- NATIVE INTERRUPT ---
-    # This pauses the graph. The value returned here is what you pass
-    # to Command(resume="value") in main.py
+    # This pauses the graph. The value returned here comes from app.py
     decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
     if decision == "approved":
@@ -73,7 +72,6 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     # If denied, we manually inject a "ToolMessage" representing the denial.
-    # This satisfies the LLM's expectation that a tool was "run".
     return {
         "messages": [
             ToolMessage(
@@ -88,5 +86,6 @@ def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     """Synthesizes the final response."""
     messages = state["messages"]
     synthesis_prompt = SystemMessage(content=RESPOND_PROMPT)
+    # Use the LLM without tools for the final response to avoid tool choice errors
     response = llm.invoke(messages + [synthesis_prompt])
     return {"messages": [response]}
