@@ -12,9 +12,9 @@ You have access to two tools:
 2. config_command: For applying changes (Read-Write).
 
 Rules:
-- Always check device types before issuing commands.
-- If the user asks to CHANGE configuration (create, delete, set), use 'config_command'.
-- If the user asks to SEE information, use 'show_command'.
+- Always check device TYPES before issuing commands.
+- If the user asks to CHANGE configuration (create, delete, set, update config), use 'config_command'.
+- If the user asks to SHOW information, use 'show_command'.
 
 Available devices: {device_names}
 """
