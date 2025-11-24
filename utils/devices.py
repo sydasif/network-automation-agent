@@ -1,34 +1,36 @@
-# utils/devices.py
 import logging
 import os
 from contextlib import contextmanager
 from typing import Dict, Generator, List
 
 import yaml
-from cachetools import TTLCache, cached
 from netmiko import BaseConnection, ConnectHandler
 
-from settings import CACHE_TTL, DEVICE_TIMEOUT, INVENTORY_FILE
+# UPDATED: Removed cachetools import
+from settings import DEVICE_TIMEOUT, INVENTORY_FILE
 
-_inventory_cache = TTLCache(maxsize=1, ttl=CACHE_TTL)
 
-
-@cached(_inventory_cache)
 def _load_inventory() -> Dict[str, dict]:
-    """Loads and caches the YAML inventory."""
+    """
+    Loads the YAML inventory.
+    KISS: Reads directly from disk. OS file caching makes this fast enough.
+    """
     if not INVENTORY_FILE.exists():
         return {}
 
     with open(INVENTORY_FILE, "r") as f:
         data = yaml.safe_load(f) or {}
 
-    # Convert list to dict for faster lookups: {'sw1': {...}, 'sw2': {...}}
+    # Convert list to dict: {'sw1': {...}, 'sw2': {...}}
     return {d["name"]: d for d in data.get("devices", [])}
 
 
 def get_all_device_names() -> List[str]:
     """Returns just the list of names."""
     return list(_load_inventory().keys())
+
+
+# Removed: clear_device_cache() (No longer needed)
 
 
 @contextmanager
@@ -39,7 +41,7 @@ def get_device_connection(device_name: str) -> Generator[BaseConnection, None, N
         dev_conf = inventory.get(device_name)
 
         if not dev_conf:
-            raise ValueError(f"Device {device_name} not found in {INVENTORY_FILE}")
+            raise ValueError(f"Device {device_name} not found.")
 
         password = os.environ.get(dev_conf["password_env_var"])
         if not password:
