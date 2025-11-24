@@ -14,205 +14,90 @@
 
 </div>
 
-The Network AI Agent is a smart, intuitive solution for network automation. By leveraging the power of AI, it simplifies network management, reduces manual effort, and empowers network engineers to focus on more strategic initiatives.
+A lightweight, "Human-in-the-Loop" AI agent that translates natural language into network configuration and show commands. Built with **LangGraph**, **Netmiko**, and **Chainlit**.
 
----
+## ⚡ Quick Start
 
-## 🚀 Key Features
+### 1. Installation
 
-- **🤖 AI-Powered Network Commands**: Use natural language to manage network devices.
-- **🌐 Multi-Device Support**: Execute commands across multiple devices simultaneously.
-- **⚡ Parallel Execution**: Efficiently process commands in parallel.
-- **📊 Structured Output**: Receive beautifully formatted output for easy readability.
-- **🔗 Workflow Management**: Manage complex network workflows with a powerful state machine.
-- **🔒 Secure Device Access**: Ensure secure device communication with SSH connectivity.
-- **👥 Human-in-the-Loop**: Configuration changes require explicit approval for safety.
-
----
-
-## 📦 Installation & Configuration
-
-Get up and running with the Network AI Agent in a few simple steps.
-
-### Prerequisites
-
-- Python 3.12+
-- `uv` package manager
-- SSH access to your network devices
-- A Groq API key for AI functionality
-
-### Setup Instructions
-
-1. **Clone the repository**:
-
-    ```bash
-    git clone https://github.com/sydasif/network-automation-agent.git
-    cd network-agent
-    ```
-
-2. **Install dependencies**:
-
-    ```bash
-    uv sync
-    ```
-
-3. **Configure your environment**:
-
-    ```bash
-    cp .env.example .env
-    ```
-
-    Then, add your Groq API key to the newly created `.env` file.
-
-4. **Configure and Migrate Network Devices**:
-    The device inventory is managed by a SQLite database (`inventory.db`). To populate it:
-
-    a. Create a `hosts.yaml` file using the example:
-
-    ```bash
-    cp hosts.example.yaml hosts.yaml
-    ```
-
-    b. Edit `hosts.yaml` with your device details
-
-    c. Run the migration script:
-
-    ```bash
-    uv run hosts.py
-    ```
-
-    This will create an `inventory.db` file. After migration, the `hosts.yaml` file is no longer used.
-
----
-
-## 🎮 Quick Start
-
-To run the agent in interactive mode, use the following command:
+Requires Python 3.12+.
 
 ```bash
-uv run main.py
+git clone https://github.com/yourusername/network-agent.git
+cd network-agent
+uv sync  # Or: pip install -r requirements.txt
 ```
 
-You can then enter commands in natural language, such as:
+### 2. Configuration
 
-- `Show me the version of router-1`
-- `Show interfaces on switch-1`
-- `Show version on all devices`
-- `Set interface eth0/1 on sw1 to be in vlan 100` (requires approval)
+The agent requires two files in the root directory: `.env` (secrets) and `hosts.yaml` (inventory).
 
-> Use config, add, delete, set, update and remove words for configuration changes
+**Create `.env`:**
 
----
+```ini
+GROQ_API_KEY=gsk_your_api_key_here
+LLM_MODEL_NAME=openai/gpt-oss-20b
+# Default password for devices using the DEVICE_PASSWORD variable
+DEVICE_PASSWORD=your_secure_password
+```
 
-## 🎬 Usage Snapshot
+**Create `hosts.yaml`:**
 
-Here's a snapshot of the Network AI Agent in action:
+```yaml
+devices:
+  - name: sw1
+    host: 192.168.1.10
+    username: admin
+    # Maps to the env var name defined in .env
+    password_env_var: DEVICE_PASSWORD
+    device_type: cisco_ios
 
-<details>
-<summary>Click to see the full usage example</summary>
+  - name: rtr1
+    host: 192.168.1.1
+    username: cisco
+    password_env_var: DEVICE_PASSWORD
+    device_type: cisco_xe
+```
+
+### 3. Usage
+
+**Web Interface (Recommended):**
 
 ```bash
-🤖 Network AI Agent Ready! (Type 'quit' to exit)
-
-You: Hi, what you can do?
-
-🤖 Agent: Sure! Here's a quick snapshot of what I can help you with:
-
-| What I can do | How I'll help |
-|---------------|---------------|
-| **Run show commands** | Execute `show` commands (e.g., `show version`, `show interfaces`, `show running-config`) on your switches (`sw1`, `sw2`). |
-| **Apply configuration changes** | Use `config_command` to push config updates (interfaces, VLANs, routing, etc.). I'll confirm the exact changes before sending them to the device. |
-| **Verify device type** | I'll always check the device type first to avoid mis‑commands. |
-| **Answer questions** | Explain network concepts, troubleshoot common issues, or walk you through best practices. |
-
-Just let me know what you'd like to do—whether it's a quick status check or a configuration tweak—and I'll take care of it!
-
-You: Check vlans on all device
-
-🤖 Agent: **VLANs on all devices**
-
-| Device | VLAN ID | VLAN Name      | Status      | Interfaces |
-|--------|---------|----------------|-------------|------------|
-| **sw1** | 1   | default        | active      | Et0/3 |
-|        | 10  | VLAN0010       | active      | – |
-|        | 100 | site_a         | active      | Et0/2 |
-|        | 1002 | fddi-default  | act/unsup   | – |
-|        | 1003 | token-ring-default | act/unsup | – |
-|        | 1004 | fddinet-default | act/unsup | – |
-|        | 1005 | trnet-default | act/unsup   | – |
-
-| Device | VLAN ID | VLAN Name      | Status      | Interfaces |
-|--------|---------|----------------|-------------|------------|
-| **sw2** | 1   | default        | active      | Et0/3 |
-|        | 100 | site_b         | active      | Et0/2 |
-|        | 1002 | fddi-default  | act/unsup   | – |
-|        | 1003 | token-ring-default | act/unsup | – |
-|        | 1004 | fddinet-default | act/unsup | – |
-|        | 1005 | trnet-default | act/unsup   | – |
-
-*All commands succeeded and returned the current VLAN configuration for each switch.*
-
-You: remove vlan 10 from sw1
-
-⚠️  APPROVAL REQUIRED ⚠️
-Action:  config_command
-Args:    {'configs': ['no vlan 10'], 'device': 'sw1'}
-Authorize? (yes/no): yes
-
-🤖 Agent: **Configuration change applied**
-
-- **Device:** `sw1`
-- **Command executed:** `no vlan 10`
-- **Result:** VLAN 10 has been removed from the switch configuration. No errors were reported.
-
-You: quit
-Goodbye!
+chainlit run app.py -w
 ```
 
-</details>
+**CLI Mode:**
 
----
-
-## 🏗️ Architecture
-
-The agent is built on a `LangGraph`-based state machine with three main nodes:
-
-1. **Understand**: Parses the user's intent to extract device names and commands.
-2. **Execute**: Runs the network commands on the specified devices (with approval for configuration changes).
-3. **Respond**: Formats and returns the results to the user.
-
-<div align="center">
-
-```mermaid
-graph TD;
-    A[Understand] --> B{Tool Call?};
-    B -->|Yes| C[Execute];
-    C --> D[Respond];
-    B -->|No| D;
+```bash
+python main.py
 ```
 
-</div>
-
 ---
 
-## 📚 Documentation
+## 🏗️ Architecture & Logic
 
-For detailed API and component documentation, please see the [DOCUMENTATION.md](DOCUMENTATION.md) file.
+The project follows a flattened, **KISS** architecture:
 
----
+| File | Purpose |
+| :--- | :--- |
+| **`agent.py`** | The "Brain". Contains the LangGraph state machine, prompts, and LLM logic. |
+| **`tools.py`** | The "Hands". Handles SSH connections (Netmiko) and LangChain tool definitions. |
+| **`settings.py`** | Central configuration and path management. |
+| **`app.py`** | Chainlit Web UI entry point. |
+| **`main.py`** | Terminal CLI entry point. |
 
-## 🤝 Contributing
+### The Workflow (ReAct Loop)
 
-Contributions are welcome! If you'd like to contribute, please follow these steps:
+1. **Understand Node**: The LLM analyzes your request (e.g., "Check VLANs").
+2. **Routing**:
+    * *Read-Only (Show)*: Routes to **Execute**.
+    * *Config (Change)*: Routes to **Approval** (Interrupts for human permission).
+3. **Execute Node**: Runs the command via Netmiko.
+4. **Loop**: The output is fed back to **Understand**, which formats the final answer.
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature-name`).
-3. Make your changes and commit them (`git commit -m 'Add some feature'`).
-4. Push to the branch (`git push origin feature/your-feature-name`).
-5. Open a pull request.
+### 🛡️ Security Features
 
----
-
-## 📄 License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+* **Human Approval**: Any command that modifies configuration (`config_command`) requires explicit "Yes/Approve" from the user.
+* **Env Vars**: Passwords are never stored in plain text in the inventory file.
+* **Read-Only Default**: The agent prefers `show_command` unless explicitly asked to configure.
