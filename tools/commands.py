@@ -4,7 +4,6 @@ from typing import List, Union
 
 from langchain_core.tools import tool
 
-# UPDATED: Removed ThreadPoolExecutor import
 from utils.devices import get_all_device_names, get_device_connection
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,6 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
 
     device_list = [device] if isinstance(device, str) else device
 
-    # Validation
     all_devs = get_all_device_names()
     invalid = [d for d in device_list if d not in all_devs]
     if invalid:
@@ -26,8 +24,7 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
 
     results = {}
 
-    # KISS: Simple sequential loop
-    # Easy to read, easy to debug. fast enough for <10 devices.
+    # KISS: Sequential Loop
     for dev_name in device_list:
         try:
             with get_device_connection(dev_name) as conn:

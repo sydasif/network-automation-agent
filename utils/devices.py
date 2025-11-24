@@ -6,31 +6,23 @@ from typing import Dict, Generator, List
 import yaml
 from netmiko import BaseConnection, ConnectHandler
 
-# UPDATED: Removed cachetools import
 from settings import DEVICE_TIMEOUT, INVENTORY_FILE
 
 
 def _load_inventory() -> Dict[str, dict]:
-    """
-    Loads the YAML inventory.
-    KISS: Reads directly from disk. OS file caching makes this fast enough.
-    """
+    """Loads the YAML inventory directly from disk."""
     if not INVENTORY_FILE.exists():
         return {}
 
     with open(INVENTORY_FILE, "r") as f:
         data = yaml.safe_load(f) or {}
 
-    # Convert list to dict: {'sw1': {...}, 'sw2': {...}}
     return {d["name"]: d for d in data.get("devices", [])}
 
 
 def get_all_device_names() -> List[str]:
     """Returns just the list of names."""
     return list(_load_inventory().keys())
-
-
-# Removed: clear_device_cache() (No longer needed)
 
 
 @contextmanager

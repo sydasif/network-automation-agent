@@ -1,8 +1,8 @@
 """agent.py: The complete Network AI Agent logic."""
 
-from typing import Annotated, Any, List, Literal, TypedDict
+from typing import Annotated, Any, Literal, TypedDict
 
-from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage, trim_messages
+from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_groq import ChatGroq
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -10,9 +10,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.types import StateSnapshot, interrupt
 
-from settings import GROQ_API_KEY, LLM_MAX_TOKENS, LLM_MODEL_NAME, LLM_TEMPERATURE
-
-# Reverted imports to original folder structure
+from settings import GROQ_API_KEY, LLM_MODEL_NAME, LLM_TEMPERATURE, MAX_HISTORY_MESSAGES
 from tools.commands import config_command, show_command
 from utils.devices import get_all_device_names
 
@@ -20,13 +18,11 @@ from utils.devices import get_all_device_names
 NODE_UNDERSTAND = "understand"
 NODE_APPROVAL = "approval"
 NODE_EXECUTE = "execute"
-# REMOVED: NODE_RESPOND
 
 RESUME_APPROVED = "approved"
 RESUME_DENIED = "denied"
 
 # --- PROMPTS ---
-# Merged instructions into a single prompt
 UNDERSTAND_PROMPT = """
 You are a network automation assistant.
 
@@ -44,8 +40,6 @@ Rules:
 Available devices: {device_names}
 """
 
-# REMOVED: RESPOND_PROMPT
-
 
 # --- LLM SETUP ---
 def _create_llm():
@@ -54,16 +48,9 @@ def _create_llm():
     return ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY)
 
 
-def _manage_chat_history(messages: List[BaseMessage]) -> List[BaseMessage]:
-    return trim_messages(
-        messages,
-        max_tokens=LLM_MAX_TOKENS,
-        strategy="last",
-        token_counter=len,
-        start_on="human",
-        end_on=("human", "ai"),
-        include_system=False,
-    )
+def _limit_history(messages: list) -> list:
+    """KISS: Keep only the last N messages."""
+    return messages[-MAX_HISTORY_MESSAGES:]
 
 
 llm = _create_llm()
@@ -75,14 +62,16 @@ execute_node = ToolNode(tools)
 # --- NODES ---
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     messages = state.get("messages", [])
-    trimmed_messages = _manage_chat_history(messages)
-    device_names = get_all_device_names()
 
+    # Simple list slicing
+    recent_messages = _limit_history(messages)
+
+    device_names = get_all_device_names()
     system_msg = SystemMessage(
         content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))
     )
 
-    response = llm_with_tools.invoke([system_msg] + trimmed_messages)
+    response = llm_with_tools.invoke([system_msg] + recent_messages)
     return {"messages": [response]}
 
 
@@ -107,9 +96,6 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-# REMOVED: respond_node function
-
-
 # --- ROUTING ---
 class State(TypedDict):
     messages: Annotated[list, add_messages]
@@ -118,9 +104,8 @@ class State(TypedDict):
 def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:
     last_message = state["messages"][-1]
 
-    # If no tool called, we are done. The LLM has already spoken.
     if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
-        return END  # Changed from NODE_RESPOND to END
+        return END
 
     tool_name = last_message.tool_calls[0]["name"]
     if tool_name == "config_command":
@@ -131,7 +116,6 @@ def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:
 
 def route_approval(state: State) -> Literal[NODE_EXECUTE, NODE_UNDERSTAND]:
     last_message = state["messages"][-1]
-    # If denied (ToolMessage), loop back to Understand so it can apologize
     if isinstance(last_message, ToolMessage):
         return NODE_UNDERSTAND
     return NODE_EXECUTE
@@ -143,7 +127,6 @@ def create_graph():
     workflow.add_node(NODE_UNDERSTAND, understand_node)
     workflow.add_node(NODE_APPROVAL, approval_node)
     workflow.add_node(NODE_EXECUTE, execute_node)
-    # REMOVED: workflow.add_node(NODE_RESPOND, ...)
 
     workflow.set_entry_point(NODE_UNDERSTAND)
 

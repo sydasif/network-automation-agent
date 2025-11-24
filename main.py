@@ -31,8 +31,6 @@ def chat_loop(app) -> None:
                 print(f"Args:    {tool_call['args']}")
 
                 choice = input("Authorize? (yes/no): ").strip().lower()
-
-                # DRY: Use constants
                 resume_value = RESUME_APPROVED if choice in ["yes", "y"] else RESUME_DENIED
 
                 result = app.invoke(Command(resume=resume_value), config)
