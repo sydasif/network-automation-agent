@@ -5,20 +5,18 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 
-# NEW IMPORT
+# UPDATED IMPORTS
 from graph.consts import (
     NODE_APPROVAL,
-    NODE_EXECUTE_READ,
-    NODE_EXECUTE_WRITE,
+    NODE_EXECUTE,
     NODE_RESPOND,
     NODE_UNDERSTAND,
 )
 from graph.nodes import (
     approval_node,
-    read_tool_node,
+    execute_node,  # Single node
     respond_node,
     understand_node,
-    write_tool_node,
 )
 
 
@@ -26,7 +24,7 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
-def route_tools(state: State) -> Literal[NODE_EXECUTE_READ, NODE_APPROVAL, NODE_RESPOND]:
+def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, NODE_RESPOND]:
     """Decides where to go after 'understand'."""
     last_message = state["messages"][-1]
 
@@ -38,18 +36,19 @@ def route_tools(state: State) -> Literal[NODE_EXECUTE_READ, NODE_APPROVAL, NODE_
     if tool_name == "config_command":
         return NODE_APPROVAL
 
-    return NODE_EXECUTE_READ
+    # Safe tools go straight to execution
+    return NODE_EXECUTE
 
 
-def route_approval(state: State) -> Literal[NODE_EXECUTE_WRITE, NODE_RESPOND]:
+def route_approval(state: State) -> Literal[NODE_EXECUTE, NODE_RESPOND]:
     """Decides where to go after 'approval'."""
     last_message = state["messages"][-1]
 
-    # If the approval node inserted a ToolMessage (denial), go to respond
     if isinstance(last_message, ToolMessage):
         return NODE_RESPOND
 
-    return NODE_EXECUTE_WRITE
+    # Approved? Go to execution
+    return NODE_EXECUTE
 
 
 def create_graph():
@@ -57,8 +56,7 @@ def create_graph():
 
     workflow.add_node(NODE_UNDERSTAND, understand_node)
     workflow.add_node(NODE_APPROVAL, approval_node)
-    workflow.add_node(NODE_EXECUTE_READ, read_tool_node)
-    workflow.add_node(NODE_EXECUTE_WRITE, write_tool_node)
+    workflow.add_node(NODE_EXECUTE, execute_node)  # Single node add
     workflow.add_node(NODE_RESPOND, respond_node)
 
     workflow.set_entry_point(NODE_UNDERSTAND)
@@ -67,7 +65,7 @@ def create_graph():
         NODE_UNDERSTAND,
         route_tools,
         {
-            NODE_EXECUTE_READ: NODE_EXECUTE_READ,
+            NODE_EXECUTE: NODE_EXECUTE,
             NODE_APPROVAL: NODE_APPROVAL,
             NODE_RESPOND: NODE_RESPOND,
         },
@@ -76,11 +74,11 @@ def create_graph():
     workflow.add_conditional_edges(
         NODE_APPROVAL,
         route_approval,
-        {NODE_EXECUTE_WRITE: NODE_EXECUTE_WRITE, NODE_RESPOND: NODE_RESPOND},
+        {NODE_EXECUTE: NODE_EXECUTE, NODE_RESPOND: NODE_RESPOND},
     )
 
-    workflow.add_edge(NODE_EXECUTE_READ, NODE_RESPOND)
-    workflow.add_edge(NODE_EXECUTE_WRITE, NODE_RESPOND)
+    # Both paths lead here now
+    workflow.add_edge(NODE_EXECUTE, NODE_RESPOND)
     workflow.add_edge(NODE_RESPOND, END)
 
     return workflow.compile(checkpointer=MemorySaver())

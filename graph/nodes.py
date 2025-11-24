@@ -1,32 +1,75 @@
-from typing import Any
+from typing import Any, List
 
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import BaseMessage, SystemMessage, ToolMessage, trim_messages
+from langchain_groq import ChatGroq
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
 from graph.consts import RESUME_APPROVED
-from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
-from llm.client import create_llm
-from llm.utils import manage_chat_history  # <--- NEW IMPORT
+from settings import GROQ_API_KEY, LLM_MAX_TOKENS, LLM_MODEL_NAME, LLM_TEMPERATURE
 from tools.commands import config_command, show_command
 from utils.devices import get_all_device_names
 
-llm = create_llm()
-llm_with_tools = llm.bind_tools([show_command, config_command])
+# --- PROMPTS ---
+UNDERSTAND_PROMPT = """
+You are a network automation assistant.
 
-read_tool_node = ToolNode([show_command])
-write_tool_node = ToolNode([config_command])
+You have access to two tools:
+1. show_command: For retrieving information (Read-Only).
+2. config_command: For applying changes (Read-Write).
+
+Rules:
+- Always check device TYPES before issuing commands.
+- If the user asks to CHANGE configuration (create, delete, set, update config), use 'config_command'.
+- If the user asks to SHOW information, use 'show_command'.
+
+Available devices: {device_names}
+"""
+
+RESPOND_PROMPT = """
+You are a technical documentation assistant.
+Receive raw JSON/Python dictionary output from network devices.
+Convert it into a clean, concise Markdown summary.
+Use tables for lists. Do not include the raw JSON in the output.
+"""
 
 
+# --- LLM SETUP ---
+def _create_llm():
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY not set in environment")
+
+    return ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY)
+
+
+def _manage_chat_history(messages: List[BaseMessage]) -> List[BaseMessage]:
+    return trim_messages(
+        messages,
+        max_tokens=LLM_MAX_TOKENS,
+        strategy="last",
+        token_counter=len,
+        start_on="human",
+        end_on=("human", "ai"),
+        include_system=False,
+    )
+
+
+# Initialize Global Components
+llm = _create_llm()
+tools = [show_command, config_command]
+llm_with_tools = llm.bind_tools(tools)
+execute_node = ToolNode(tools)
+
+
+# --- NODES ---
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """Analyzes user intent and generates tool calls."""
     messages = state.get("messages", [])
 
-    # DRY: Use centralized context manager
-    trimmed_messages = manage_chat_history(messages)
+    # Trim history inline
+    trimmed_messages = _manage_chat_history(messages)
 
     device_names = get_all_device_names()
-
     system_msg = SystemMessage(
         content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))
     )
@@ -36,19 +79,13 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
-    """
-    Gatekeeper node.
-    - Pauses execution for human review.
-    - If Approved: Returns None (Graph continues to write_tool_node).
-    - If Denied: Returns a ToolMessage (Graph skips execution and goes to Respond).
-    """
+    """Gatekeeper for dangerous commands."""
     last_msg = state["messages"][-1]
 
     if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
         return None
 
     tool_call = last_msg.tool_calls[0]
-
     decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
     if decision == RESUME_APPROVED:
