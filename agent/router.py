@@ -1,4 +1,8 @@
-"""agent/router.py: Logic for conditional edges in the graph."""
+"""Agent routing logic for the Network AI Agent.
+
+This module contains the routing functions that determine the flow of the
+LangGraph workflow based on the state and tool calls.
+"""
 
 from typing import Literal
 
@@ -10,11 +14,21 @@ from tools.commands import config_command
 
 
 def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:
-    """
-    Router checks if the tool call requires human approval.
+    """Route the workflow based on the tool called in the last message.
+
+    Determines whether the workflow should proceed to execution or approval
+    based on whether the tool called is a configuration command that requires
+    human approval.
+
+    Args:
+        state: The current state of the workflow containing messages.
+
+    Returns:
+        The next node in the workflow: NODE_EXECUTE, NODE_APPROVAL, or END.
     """
     last_message = state["messages"][-1]
 
+    # If no tool calls are present, end the workflow
     if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
         return END
 
@@ -22,22 +36,32 @@ def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:
 
     # DRY: Use the actual tool name property instead of a hardcoded string.
     # If the tool name changes in tools/commands.py, this logic stays valid.
+    # Route to approval for config commands that modify device configuration
     if tool_name == config_command.name:
         return NODE_APPROVAL
 
+    # For other commands (like show commands), execute directly
     return NODE_EXECUTE
 
 
 def route_approval(state: State) -> Literal[NODE_EXECUTE, NODE_UNDERSTAND]:
-    """
-    Determines next step after approval node.
-    If the user denied (ToolMessage injected), go back to Understand to explain why.
-    If approved (no output/None), go to Execute.
+    """Route the workflow after the approval node based on user decision.
+
+    If the user denied approval (ToolMessage injected), route back to Understand
+    to explain why the action was denied. If approved, proceed to Execute.
+
+    Args:
+        state: The current state of the workflow containing messages.
+
+    Returns:
+        The next node in the workflow: NODE_EXECUTE or NODE_UNDERSTAND.
     """
     last_message = state["messages"][-1]
 
     # If the last message is a ToolMessage, it means we injected a "Denied" response
+    # This happens when the user denies a configuration change request
     if isinstance(last_message, ToolMessage):
         return NODE_UNDERSTAND
 
+    # If no ToolMessage is present, the approval was granted, proceed to execute
     return NODE_EXECUTE

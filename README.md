@@ -36,7 +36,7 @@ The agent requires two files in the root directory: `.env` (secrets) and `hosts.
 
 ```ini
 GROQ_API_KEY=gsk_your_api_key_here
-LLM_MODEL_NAME=openai/gpt-oss-20b
+LLM_MODEL_NAME=llama3-70b-8192  # or another supported model
 DEVICE_PASSWORD=your_secure_password
 ```
 
@@ -88,8 +88,10 @@ The project follows a flattened, **KISS** architecture:
 | :--- | :--- |
 | **`agent/`** | The "Brain". Contains the LangGraph state machine, prompts, and router. |
 | **`tools/`** | The "Hands". Handles SSH connections (Netmiko) and robust command parsing. |
+| **`utils/devices.py`** | Device inventory management and connection handling. |
 | **`app.py`** | Chainlit Web UI entry point. |
 | **`main.py`** | Terminal CLI entry point. |
+| **`settings.py`** | Configuration settings for the application. |
 
 ### Key Features
 
@@ -110,3 +112,86 @@ The project follows a flattened, **KISS** architecture:
     * *Config*: Routes to **Approval** (Interrupts for human permission).
 3. **Execute Node**: Runs the command via Netmiko.
 4. **Loop**: Output is fed back to the LLM to format the final answer.
+
+---
+
+## 📚 API Documentation
+
+### Modules
+
+- **`agent.nodes`**: Defines the graph state, constants, and node logic for the LangGraph workflow
+- **`agent.router`**: Contains routing logic for conditional edges in the workflow
+- **`agent.workflow`**: Assembles the complete LangGraph workflow
+- **`tools.commands`**: Network command tools for show and configuration commands
+- **`utils.devices`**: Handles device inventory loading and connection management
+- **`settings`**: Contains configuration settings for the application
+- **`app`**: Chainlit web interface entry point
+- **`main`**: CLI entry point
+
+### Key Functions
+
+- `run_single_command()`: Execute a single network command through the agent workflow
+- `create_graph()`: Creates and compiles the LangGraph workflow
+- `show_command()`: Execute read-only 'show' commands on network devices
+- `config_command()`: Apply configuration changes to network devices
+- `get_device_connection()`: Context manager for establishing device connections
+
+---
+
+## 🛠️ Development
+
+### Project Setup
+
+To set up the development environment:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/network-agent.git
+cd network-agent
+
+# Install dependencies
+uv sync  # or pip install -r requirements.txt
+
+# Create virtual environment (optional but recommended)
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv sync
+```
+
+### Running Tests
+
+Currently, there are no automated tests in the project. To manually test functionality:
+
+1. Start the web interface: `chainlit run app.py -w`
+2. Or test the CLI: `python main.py "show version on sw1"`
+
+### Code Formatting
+
+The project uses Ruff for linting and formatting:
+
+```bash
+# Run linter and auto-fix issues
+ruff check --fix .
+
+# Format code
+ruff format .
+```
+
+---
+
+## 🚀 Deployment
+
+### Prerequisites
+
+- Python 3.12+
+- `uv` package manager or `pip`
+- Network device access (SSH)
+
+### Production Deployment
+
+1. Clone the repository to your server
+2. Set up the virtual environment
+3. Configure the `.env` and `hosts.yaml` files appropriately
+4. Run the application using a process manager like systemd, pm2, or similar
+
+For web deployment, consider using a WSGI server like Gunicorn with a reverse proxy like Nginx.
