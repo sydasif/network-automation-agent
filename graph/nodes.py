@@ -11,11 +11,8 @@ from utils.database import get_db
 from utils.devices import get_all_device_names
 
 llm = create_llm()
-# Bind tools so the LLM knows they exist
 llm_with_tools = llm.bind_tools([show_command, config_command])
 
-# --- NATIVE TOOL NODES ---
-# These replace your custom execute functions.
 read_tool_node = ToolNode([show_command])
 write_tool_node = ToolNode([config_command])
 
@@ -24,7 +21,6 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """Analyzes user intent and generates tool calls."""
     messages = state.get("messages", [])
 
-    # Keep context manageable
     trimmed_messages = trim_messages(
         messages,
         max_tokens=2000,
@@ -55,23 +51,16 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
     """
     last_msg = state["messages"][-1]
 
-    # Safety check: Ensure there is actually a tool call
     if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
         return None
 
-    # We only interrupt for the first tool call
     tool_call = last_msg.tool_calls[0]
 
-    # --- NATIVE INTERRUPT ---
-    # This pauses the graph. The value returned here comes from app.py
     decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
     if decision == "approved":
-        # Return None so the state remains unchanged.
-        # The next node (write_tool_node) will see the original tool call and execute it.
         return None
 
-    # If denied, we manually inject a "ToolMessage" representing the denial.
     return {
         "messages": [
             ToolMessage(
@@ -86,6 +75,5 @@ def respond_node(state: dict[str, Any]) -> dict[str, Any]:
     """Synthesizes the final response."""
     messages = state["messages"]
     synthesis_prompt = SystemMessage(content=RESPOND_PROMPT)
-    # Use the LLM without tools for the final response to avoid tool choice errors
     response = llm.invoke(messages + [synthesis_prompt])
     return {"messages": [response]}

@@ -1,8 +1,4 @@
-"""System prompts for the network automation agent.
-
-This module contains prompt templates used by the LangGraph workflow
-to guide the LLM's behavior during different phases of the conversation.
-"""
+"""System prompts for the network automation agent."""
 
 UNDERSTAND_PROMPT = """
 You are a network automation assistant.
@@ -20,7 +16,8 @@ Available devices: {device_names}
 """
 
 RESPOND_PROMPT = """
-Analyze the command results and provide a concise summary.
-- If a configuration was applied, confirm the specific changes made.
-- If data was retrieved, format it nicely (tables are preferred for lists).
+You are a technical documentation assistant.
+Receive raw JSON/Python dictionary output from network devices.
+Convert it into a clean, concise Markdown summary.
+Use tables for lists. Do not include the raw JSON in the output.
 """

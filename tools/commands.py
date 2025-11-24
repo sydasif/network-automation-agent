@@ -1,15 +1,10 @@
-"""Network command execution tools.
-
-Contains tools for:
-1. show_command: Read-only operations (Parallel execution supported).
-2. config_command: Configuration changes (Single device, requires approval).
-"""
+"""Network command execution tools."""
 
 import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Union, List
+from typing import List, Union
 
 from langchain_core.tools import tool
 from netmiko import ConnectHandler
@@ -21,21 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_connection_params(device_name: str) -> dict:
-    """Retrieves connection parameters for a device from the database.
-
-    This helper function queries the database to retrieve connection details
-    for the specified device, including host, username, device type, and
-    password from the environment variable.
-
-    Args:
-        device_name: Name of the device to retrieve connection parameters for.
-
-    Returns:
-        Dictionary containing connection parameters for ConnectHandler.
-
-    Raises:
-        ValueError: If device is not found or password environment variable is not set.
-    """
+    """Retrieves connection parameters for a device from the database."""
     with get_db() as db:
         dev_conf = db.query(Device).filter(Device.name == device_name).first()
         if not dev_conf:
@@ -56,28 +37,12 @@ def _get_connection_params(device_name: str) -> dict:
 
 @tool
 def show_command(device: Union[str, list[str]], command: str) -> str:
-    """Execute a read-only 'show' command on one or more devices.
-
-    This tool executes read-only commands on network devices in parallel.
-    It supports executing commands on single or multiple devices and
-    automatically parses the output using TextFSM for structured results.
-
-    Use this for: show version, show interfaces, show run, etc.
-
-    Args:
-        device: Single device name or list of device names to execute the command on.
-        command: The show command to execute on the device(s).
-
-    Returns:
-        JSON string containing command results for each device.
-    """
+    """Execute a read-only 'show' command on one or more devices."""
     if not command or not command.strip():
         return json.dumps({"error": "Command cannot be empty."})
 
-    # Normalize to list
     device_list = [device] if isinstance(device, str) else device
 
-    # Validate devices
     with get_db() as db:
         all_devs = get_all_device_names(db)
         invalid = [d for d in device_list if d not in all_devs]
@@ -90,20 +55,15 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
         try:
             params = _get_connection_params(dev_name)
             with ConnectHandler(**params) as conn:
-                # Netmiko auto-detects textfsm
                 output = conn.send_command(command, use_textfsm=True)
                 return dev_name, {"success": True, "data": output}
         except Exception as e:
             logger.error(f"Error on {dev_name}: {e}")
             return dev_name, {"success": False, "error": str(e)}
 
-    # Parallel Execution
-    # Limit max workers to 10 or the number of devices, whichever is smaller
     max_workers = min(len(device_list), 10)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Create a mapping of futures to device names for result tracking
         futures = {executor.submit(_exec, dev): dev for dev in device_list}
-        # Process completed futures as they finish to improve responsiveness
         for future in as_completed(futures):
             dev, res = future.result()
             results[dev] = res
@@ -113,30 +73,13 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
 
 @tool
 def config_command(device: str, configs: List[str]) -> str:
-    """Apply configuration changes to a SINGLE network device.
-
-    This tool applies configuration changes to a single network device.
-    It requires human approval before execution to prevent unauthorized
-    changes to network devices. The tool automatically saves the
-    configuration after successful application.
-
-    Use this for: interface changes, ip addressing, routing protocol config.
-    WARNING: This tool requires human approval before execution.
-
-    Args:
-        device: Name of the single device to apply configuration changes to.
-        configs: List of configuration commands to apply.
-
-    Returns:
-        JSON string containing the result of the configuration operation.
-    """
+    """Apply configuration changes to a SINGLE network device."""
     if not configs:
         return json.dumps({"error": "No configuration commands provided."})
 
     try:
         params = _get_connection_params(device)
         with ConnectHandler(**params) as conn:
-            # send_config_set handles 'conf t' and 'end'
             output = conn.send_config_set(configs)
             conn.save_config()
             return json.dumps({"device": device, "status": "configured", "output": output})
