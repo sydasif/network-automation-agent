@@ -3,6 +3,7 @@ import uuid
 import chainlit as cl
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
+from utils.graph import get_approval_request  # <--- NEW IMPORT
 
 from graph.router import create_graph
 
@@ -12,24 +13,14 @@ graph = create_graph()
 
 @cl.on_chat_start
 async def start():
-    """
-    Initializes the user session.
-    Generates a unique thread_id so multiple users don't share state.
-    """
     thread_id = str(uuid.uuid4())
     cl.user_session.set("config", {"configurable": {"thread_id": thread_id}})
-
     await cl.Message(content="👋 **Network AI Agent Ready!**\n").send()
 
 
 @cl.on_message
 async def on_message(message: cl.Message):
-    """
-    Main chat loop.
-    Handles the lifecycle of: Input -> Streaming -> Interrupt (Approval) -> Resume -> Output.
-    """
     config = cl.user_session.get("config")
-
     current_input = {"messages": [HumanMessage(content=message.content)]}
 
     while True:
@@ -57,16 +48,13 @@ async def on_message(message: cl.Message):
         if has_streamed:
             await final_msg.update()
 
+        # DRY FIX: Abstracted snapshot parsing
         snapshot = graph.get_state(config)
+        tool_call = get_approval_request(snapshot)
 
-        if not snapshot.tasks:
+        if not tool_call:
             break
 
-        if not snapshot.tasks[0].interrupts:
-            break
-
-        interrupt_value = snapshot.tasks[0].interrupts[0].value
-        tool_call = interrupt_value.get("tool_call", {})
         tool_name = tool_call.get("name", "Unknown Tool")
         tool_args = tool_call.get("args", {})
 
@@ -89,8 +77,6 @@ async def on_message(message: cl.Message):
                 ),
             ],
         ).send()
-
-        print(f"DEBUG: Chainlit Action Response: {res}")
 
         if res and res.get("name") == "approve":
             resume_value = "approved"

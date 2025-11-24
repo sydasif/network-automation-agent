@@ -7,7 +7,6 @@ from langgraph.types import interrupt
 from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
 from llm.client import create_llm
 from tools.commands import config_command, show_command
-from utils.database import get_db
 from utils.devices import get_all_device_names
 
 llm = create_llm()
@@ -31,8 +30,8 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         include_system=False,
     )
 
-    with get_db() as db:
-        device_names = get_all_device_names(db)
+    # REFACTORED: No DB context needed here anymore
+    device_names = get_all_device_names()
 
     system_msg = SystemMessage(
         content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))

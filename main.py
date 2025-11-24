@@ -1,16 +1,14 @@
-"""Main entry point for the Network AI Agent."""
-
 import logging
 import uuid
 
 from langchain_core.messages import HumanMessage
-from langgraph.types import Command  # <--- Used to resume execution
+from langgraph.types import Command
+from utils.graph import get_approval_request  # <--- NEW IMPORT
 
 from graph.router import create_graph
 
 
 def chat_loop(app) -> None:
-    """Runs the main chat interaction loop for the Network AI Agent."""
     session_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": f"session-{session_id}"}}
 
@@ -27,12 +25,10 @@ def chat_loop(app) -> None:
 
             result = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
 
+            # DRY FIX: Use helper instead of manual snapshot parsing
             snapshot = app.get_state(config)
 
-            while snapshot.tasks and snapshot.tasks[0].interrupts:
-                interrupt_value = snapshot.tasks[0].interrupts[0].value
-                tool_call = interrupt_value["tool_call"]
-
+            while tool_call := get_approval_request(snapshot):
                 print("\n⚠️  APPROVAL REQUIRED ⚠️")
                 print(f"Action:  {tool_call['name']}")
                 print(f"Args:    {tool_call['args']}")
@@ -41,7 +37,6 @@ def chat_loop(app) -> None:
                 resume_value = "approved" if choice in ["yes", "y"] else "denied"
 
                 result = app.invoke(Command(resume=resume_value), config)
-
                 snapshot = app.get_state(config)
 
             if "messages" in result and result["messages"]:

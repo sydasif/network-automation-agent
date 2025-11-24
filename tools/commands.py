@@ -1,38 +1,13 @@
-"""Network command execution tools."""
-
 import json
 import logging
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Union
 
 from langchain_core.tools import tool
-from netmiko import ConnectHandler
 
-from utils.database import Device, get_db
-from utils.devices import get_all_device_names
+from utils.devices import get_all_device_names, get_device_connection
 
 logger = logging.getLogger(__name__)
-
-
-def _get_connection_params(device_name: str) -> dict:
-    """Retrieves connection parameters for a device from the database."""
-    with get_db() as db:
-        dev_conf = db.query(Device).filter(Device.name == device_name).first()
-        if not dev_conf:
-            raise ValueError(f"Device {device_name} not found.")
-
-        password = os.environ.get(dev_conf.password_env_var)
-        if not password:
-            raise ValueError(f"Password env var not set for {device_name}")
-
-        return {
-            "device_type": dev_conf.device_type,
-            "host": dev_conf.host,
-            "username": dev_conf.username,
-            "password": password,
-            "timeout": 30,
-        }
 
 
 @tool
@@ -43,22 +18,20 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
 
     device_list = [device] if isinstance(device, str) else device
 
-    with get_db() as db:
-        all_devs = get_all_device_names(db)
-        invalid = [d for d in device_list if d not in all_devs]
-        if invalid:
-            return json.dumps({"error": f"Devices not found: {invalid}"})
+    # REFACTORED: No DB context needed; validation is cleaner
+    all_devs = get_all_device_names()
+    invalid = [d for d in device_list if d not in all_devs]
+    if invalid:
+        return json.dumps({"error": f"Devices not found: {invalid}"})
 
     results = {}
 
     def _exec(dev_name: str):
         try:
-            params = _get_connection_params(dev_name)
-            with ConnectHandler(**params) as conn:
+            with get_device_connection(dev_name) as conn:
                 output = conn.send_command(command, use_textfsm=True)
                 return dev_name, {"success": True, "data": output}
         except Exception as e:
-            logger.error(f"Error on {dev_name}: {e}")
             return dev_name, {"success": False, "error": str(e)}
 
     max_workers = min(len(device_list), 10)
@@ -78,8 +51,7 @@ def config_command(device: str, configs: List[str]) -> str:
         return json.dumps({"error": "No configuration commands provided."})
 
     try:
-        params = _get_connection_params(device)
-        with ConnectHandler(**params) as conn:
+        with get_device_connection(device) as conn:
             output = conn.send_config_set(configs)
             conn.save_config()
             return json.dumps({"device": device, "status": "configured", "output": output})
