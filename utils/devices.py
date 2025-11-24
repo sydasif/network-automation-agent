@@ -1,56 +1,57 @@
+# utils/devices.py
 import logging
 import os
 from contextlib import contextmanager
-from typing import Generator, List
+from typing import Dict, Generator, List
 
+import yaml
 from cachetools import TTLCache, cached
 from netmiko import BaseConnection, ConnectHandler
-from sqlalchemy.orm import Session
 
-from settings import CACHE_TTL, DEVICE_TIMEOUT  # <--- IMPORTED
+from settings import CACHE_TTL, DEVICE_TIMEOUT, INVENTORY_FILE
 
-from .database import Device, get_db
-
-# Use centralized setting
-_device_names_cache = TTLCache(maxsize=1, ttl=CACHE_TTL)
+_inventory_cache = TTLCache(maxsize=1, ttl=CACHE_TTL)
 
 
-def get_device_by_name(db: Session, device_name: str) -> Device | None:
-    return db.query(Device).filter(Device.name == device_name).first()
+@cached(_inventory_cache)
+def _load_inventory() -> Dict[str, dict]:
+    """Loads and caches the YAML inventory."""
+    if not INVENTORY_FILE.exists():
+        return {}
+
+    with open(INVENTORY_FILE, "r") as f:
+        data = yaml.safe_load(f) or {}
+
+    # Convert list to dict for faster lookups: {'sw1': {...}, 'sw2': {...}}
+    return {d["name"]: d for d in data.get("devices", [])}
 
 
-@cached(_device_names_cache)
 def get_all_device_names() -> List[str]:
-    with get_db() as db:
-        device_names = [device.name for device in db.query(Device.name).all()]
-        return device_names
-
-
-def clear_device_cache():
-    _device_names_cache.clear()
-    print("Device cache cleared.")
+    """Returns just the list of names."""
+    return list(_load_inventory().keys())
 
 
 @contextmanager
 def get_device_connection(device_name: str) -> Generator[BaseConnection, None, None]:
     conn = None
     try:
-        with get_db() as db:
-            dev_conf = db.query(Device).filter(Device.name == device_name).first()
-            if not dev_conf:
-                raise ValueError(f"Device {device_name} not found.")
+        inventory = _load_inventory()
+        dev_conf = inventory.get(device_name)
 
-            password = os.environ.get(dev_conf.password_env_var)
-            if not password:
-                raise ValueError(f"Password env var not set for {device_name}")
+        if not dev_conf:
+            raise ValueError(f"Device {device_name} not found in {INVENTORY_FILE}")
 
-            params = {
-                "device_type": dev_conf.device_type,
-                "host": dev_conf.host,
-                "username": dev_conf.username,
-                "password": password,
-                "timeout": DEVICE_TIMEOUT,  # <--- Use centralized setting
-            }
+        password = os.environ.get(dev_conf["password_env_var"])
+        if not password:
+            raise ValueError(f"Password env var not set for {device_name}")
+
+        params = {
+            "device_type": dev_conf["device_type"],
+            "host": dev_conf["host"],
+            "username": dev_conf["username"],
+            "password": password,
+            "timeout": DEVICE_TIMEOUT,
+        }
 
         conn = ConnectHandler(**params)
         yield conn
