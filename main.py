@@ -3,9 +3,10 @@ import uuid
 
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
-from utils.graph import get_approval_request  # <--- NEW IMPORT
 
+from graph.consts import RESUME_APPROVED, RESUME_DENIED  # <--- NEW IMPORT
 from graph.router import create_graph
+from utils.graph import get_approval_request
 
 
 def chat_loop(app) -> None:
@@ -24,8 +25,6 @@ def chat_loop(app) -> None:
                 continue
 
             result = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
-
-            # DRY FIX: Use helper instead of manual snapshot parsing
             snapshot = app.get_state(config)
 
             while tool_call := get_approval_request(snapshot):
@@ -34,7 +33,9 @@ def chat_loop(app) -> None:
                 print(f"Args:    {tool_call['args']}")
 
                 choice = input("Authorize? (yes/no): ").strip().lower()
-                resume_value = "approved" if choice in ["yes", "y"] else "denied"
+
+                # DRY: Use constants
+                resume_value = RESUME_APPROVED if choice in ["yes", "y"] else RESUME_DENIED
 
                 result = app.invoke(Command(resume=resume_value), config)
                 snapshot = app.get_state(config)

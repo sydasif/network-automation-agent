@@ -4,6 +4,7 @@ from langchain_core.messages import SystemMessage, ToolMessage, trim_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
+from graph.consts import RESUME_APPROVED  # <--- NEW IMPORT
 from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
 from llm.client import create_llm
 from tools.commands import config_command, show_command
@@ -30,7 +31,6 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         include_system=False,
     )
 
-    # REFACTORED: No DB context needed here anymore
     device_names = get_all_device_names()
 
     system_msg = SystemMessage(
@@ -57,7 +57,8 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
 
     decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
-    if decision == "approved":
+    # DRY: Use constant instead of raw string
+    if decision == RESUME_APPROVED:
         return None
 
     return {

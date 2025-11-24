@@ -1,12 +1,10 @@
-"""Database utilities for the network automation agent."""
-
 from contextlib import contextmanager
 from typing import Generator
 
 from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-DATABASE_URL = "sqlite:///inventory.db"
+from settings import DATABASE_URL  # <--- IMPORTED
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -28,7 +26,6 @@ class Device(Base):
 
 @contextmanager
 def get_db() -> Generator[Session, None, None]:
-    """Context manager for database sessions."""
     db = SessionLocal()
     try:
         yield db
@@ -37,7 +34,6 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def create_db_and_tables():
-    """Creates the database tables if they don't already exist."""
     Base.metadata.create_all(bind=engine)
 
 

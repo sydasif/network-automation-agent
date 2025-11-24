@@ -1,19 +1,18 @@
 """Module for setting up the LLM client for the network automation agent."""
 
-import os
-
 from langchain_groq import ChatGroq
+
+from settings import GROQ_API_KEY, LLM_MODEL_NAME, LLM_TEMPERATURE  # <--- IMPORTED
 
 
 def create_llm(api_key: str | None = None):
-    """Creates and configures a ChatGroq LLM instance for the network agent."""
-    api_key = api_key or os.getenv("GROQ_API_KEY")
+    """Creates and configures a ChatGroq LLM instance."""
+    # Use passed key or fallback to settings
+    final_api_key = api_key or GROQ_API_KEY
 
-    if not api_key:
+    if not final_api_key:
         raise RuntimeError("GROQ_API_KEY not set in environment")
 
-    model_name = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-20b")
-
-    llm = ChatGroq(temperature=0.2, model_name=model_name, api_key=api_key)
+    llm = ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=final_api_key)
 
     return llm

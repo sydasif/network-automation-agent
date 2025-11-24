@@ -5,19 +5,22 @@ from typing import Generator, List
 
 from cachetools import TTLCache, cached
 from netmiko import BaseConnection, ConnectHandler
+from sqlalchemy.orm import Session
+
+from settings import CACHE_TTL, DEVICE_TIMEOUT  # <--- IMPORTED
 
 from .database import Device, get_db
 
-# Cache device names for 5 minutes
-_device_names_cache = TTLCache(maxsize=1, ttl=300)
+# Use centralized setting
+_device_names_cache = TTLCache(maxsize=1, ttl=CACHE_TTL)
+
+
+def get_device_by_name(db: Session, device_name: str) -> Device | None:
+    return db.query(Device).filter(Device.name == device_name).first()
 
 
 @cached(_device_names_cache)
 def get_all_device_names() -> List[str]:
-    """
-    Retrieves all device names.
-    Self-contained: Manages its own DB session so caching works correctly.
-    """
     with get_db() as db:
         device_names = [device.name for device in db.query(Device.name).all()]
         return device_names
@@ -46,7 +49,7 @@ def get_device_connection(device_name: str) -> Generator[BaseConnection, None, N
                 "host": dev_conf.host,
                 "username": dev_conf.username,
                 "password": password,
-                "timeout": 30,
+                "timeout": DEVICE_TIMEOUT,  # <--- Use centralized setting
             }
 
         conn = ConnectHandler(**params)
