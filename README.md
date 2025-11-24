@@ -67,10 +67,23 @@ devices:
 chainlit run app.py -w
 ```
 
-**CLI Mode:**
+**CLI Mode (Interactive):**
 
 ```bash
 python main.py
+```
+
+**Single Command Mode:**
+
+```bash
+# Run a show command on a specific device
+python main.py --device sw1 'show version'
+
+# Run a configuration command (requires approval)
+python main.py --device sw1 'interface eth0 shutdown'
+
+# Run without specifying a device (not recommended)
+python main.py 'show ip route'
 ```
 
 ---
