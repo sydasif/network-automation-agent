@@ -12,55 +12,57 @@ def migrate_data():
     """Migrates device data from hosts.yaml to the SQLite database."""
     create_db_and_tables()
 
-    if not Path("hosts.yaml").exists():
-        print("hosts.yaml file not found. Please create it with your device data.")
+    yaml_file = Path("hosts.yaml")
+    if not yaml_file.exists():
+        print(f"{yaml_file} not found. Please create it with your device data.")
         return
 
     with get_db() as db:
         try:
-            with Path("hosts.yaml").open() as f:
+            with yaml_file.open() as f:
                 data = yaml.safe_load(f)
         except yaml.YAMLError as e:
             print(f"Error parsing hosts.yaml: {e}")
             return
-        except FileNotFoundError:
-            print("hosts.yaml file not found. Please create it with your device data.")
-            return
 
-        devices = data.get("devices", [])
-        if not devices:
+        devices_data = data.get("devices", [])
+        if not devices_data:
             print("No devices found in hosts.yaml")
             return
 
+        # DRY: Introspect the model to get schema source of truth
+        # Get all column names except the primary key 'id'
+        model_columns = {c.name for c in Device.__table__.columns if c.name != "id"}
+
         new_devices_added = False
-        for device_data in devices:
-            required_fields = ["name", "host", "username", "password_env_var", "device_type"]
-            missing_fields = [field for field in required_fields if field not in device_data]
+        for dev_data in devices_data:
+            name = dev_data.get("name")
+
+            # 1. Dynamic Validation against the Model
+            # Check if the YAML has all the columns the Database requires
+            missing_fields = model_columns - set(dev_data.keys())
             if missing_fields:
-                print(f"Skipping device due to missing fields: {missing_fields}")
+                print(f"Skipping '{name or 'unknown'}': missing fields {missing_fields}")
                 continue
 
-            existing_device = db.query(Device).filter(Device.name == device_data["name"]).first()
+            existing_device = db.query(Device).filter(Device.name == name).first()
             if existing_device:
-                print(f"Device {device_data['name']} already exists, skipping.")
+                print(f"Device {name} already exists, skipping.")
                 continue
 
-            device = Device(
-                name=device_data["name"],
-                host=device_data["host"],
-                username=device_data["username"],
-                password_env_var=device_data["password_env_var"],
-                device_type=device_data["device_type"],
-            )
+            # 2. Dynamic Instantiation
+            # Unpack the dict directly. Because we validated keys above, this is safe.
+            # This works even if you add new columns to the database later.
+            device_args = {k: v for k, v in dev_data.items() if k in model_columns}
+            device = Device(**device_args)
+
             db.add(device)
-            print(f"Adding device {device_data['name']}.")
+            print(f"Adding device {name}.")
             new_devices_added = True
 
         if new_devices_added:
             db.commit()
-
             clear_device_cache()
-
             print("Data migration complete.")
         else:
             print("No new devices to add.")

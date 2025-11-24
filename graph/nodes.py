@@ -1,12 +1,13 @@
 from typing import Any
 
-from langchain_core.messages import SystemMessage, ToolMessage, trim_messages
+from langchain_core.messages import SystemMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
-from graph.consts import RESUME_APPROVED  # <--- NEW IMPORT
+from graph.consts import RESUME_APPROVED
 from graph.prompts import RESPOND_PROMPT, UNDERSTAND_PROMPT
 from llm.client import create_llm
+from llm.utils import manage_chat_history  # <--- NEW IMPORT
 from tools.commands import config_command, show_command
 from utils.devices import get_all_device_names
 
@@ -21,15 +22,8 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     """Analyzes user intent and generates tool calls."""
     messages = state.get("messages", [])
 
-    trimmed_messages = trim_messages(
-        messages,
-        max_tokens=2000,
-        strategy="last",
-        token_counter=len,
-        start_on="human",
-        end_on=("human", "ai"),
-        include_system=False,
-    )
+    # DRY: Use centralized context manager
+    trimmed_messages = manage_chat_history(messages)
 
     device_names = get_all_device_names()
 
@@ -57,7 +51,6 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
 
     decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
-    # DRY: Use constant instead of raw string
     if decision == RESUME_APPROVED:
         return None
 
