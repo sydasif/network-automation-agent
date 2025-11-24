@@ -9,22 +9,30 @@ from utils.devices import get_all_device_names, get_device_connection
 logger = logging.getLogger(__name__)
 
 
+def _validate_devices(device_input: Union[str, list[str]]) -> tuple[list[str], str | None]:
+    """Helper to normalize input to a list and validate device names."""
+    device_list = [device_input] if isinstance(device_input, str) else device_input
+    all_devs = get_all_device_names()
+
+    invalid = [d for d in device_list if d not in all_devs]
+    if invalid:
+        return [], json.dumps({"error": f"Devices not found: {invalid}"})
+
+    return device_list, None
+
+
 @tool
 def show_command(device: Union[str, list[str]], command: str) -> str:
     """Execute a read-only 'show' command on one or more devices."""
     if not command or not command.strip():
         return json.dumps({"error": "Command cannot be empty."})
 
-    device_list = [device] if isinstance(device, str) else device
-
-    all_devs = get_all_device_names()
-    invalid = [d for d in device_list if d not in all_devs]
-    if invalid:
-        return json.dumps({"error": f"Devices not found: {invalid}"})
+    device_list, error = _validate_devices(device)
+    if error:
+        return error
 
     results = {}
 
-    # KISS: Sequential Loop
     for dev_name in device_list:
         try:
             with get_device_connection(dev_name) as conn:
@@ -38,16 +46,32 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
 
 
 @tool
-def config_command(device: str, configs: List[str]) -> str:
-    """Apply configuration changes to a SINGLE network device."""
+def config_command(device: Union[str, list[str]], configs: List[str]) -> str:
+    """Apply configuration changes to one or more network devices."""
     if not configs:
         return json.dumps({"error": "No configuration commands provided."})
 
-    try:
-        with get_device_connection(device) as conn:
-            output = conn.send_config_set(configs)
-            conn.save_config()
-            return json.dumps({"device": device, "status": "configured", "output": output})
-    except Exception as e:
-        logger.error(f"Config error on {device}: {e}")
-        return json.dumps({"success": False, "error": str(e)})
+    # FIX: Sanitize input to handle cases where LLM sends newlines in list items
+    clean_configs = []
+    for cmd in configs:
+        # Split by newline if present, strip whitespace, and ignore empty strings
+        clean_configs.extend([c.strip() for c in cmd.split("\n") if c.strip()])
+
+    device_list, error = _validate_devices(device)
+    if error:
+        return error
+
+    results = {}
+
+    for dev_name in device_list:
+        try:
+            with get_device_connection(dev_name) as conn:
+                # Use clean_configs instead of raw configs
+                output = conn.send_config_set(clean_configs)
+                conn.save_config()
+                results[dev_name] = {"success": True, "output": output}
+        except Exception as e:
+            logger.error(f"Config error on {dev_name}: {e}")
+            results[dev_name] = {"success": False, "error": str(e)}
+
+    return json.dumps({"devices": results}, indent=2)
