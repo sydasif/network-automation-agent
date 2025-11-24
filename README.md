@@ -37,7 +37,6 @@ The agent requires two files in the root directory: `.env` (secrets) and `hosts.
 ```ini
 GROQ_API_KEY=gsk_your_api_key_here
 LLM_MODEL_NAME=openai/gpt-oss-20b
-# Default password for devices using the DEVICE_PASSWORD variable
 DEVICE_PASSWORD=your_secure_password
 ```
 
@@ -48,7 +47,6 @@ devices:
   - name: sw1
     host: 192.168.1.10
     username: admin
-    # Maps to the env var name defined in .env
     password_env_var: DEVICE_PASSWORD
     device_type: cisco_ios
 
@@ -67,23 +65,17 @@ devices:
 chainlit run app.py -w
 ```
 
-**CLI Mode (Interactive):**
+**CLI Mode:**
 
 ```bash
+# Interactive mode
 python main.py
-```
 
-**Single Command Mode:**
+# Single Command (Supports Natural Language)
+python main.py "Show ip int brief on sw1"
 
-```bash
-# Run a show command on a specific device
-python main.py --device sw1 'show version'
-
-# Run a configuration command (requires approval)
-python main.py --device sw1 'interface eth0 shutdown'
-
-# Run without specifying a device (not recommended)
-python main.py 'show ip route'
+# Batch Configuration (Smart & Safe)
+python main.py "Create vlan 10 named 'Data' on sw1 and rtr1"
 ```
 
 ---
@@ -94,23 +86,27 @@ The project follows a flattened, **KISS** architecture:
 
 | File | Purpose |
 | :--- | :--- |
-| **`agent.py`** | The "Brain". Contains the LangGraph state machine, prompts, and LLM logic. |
-| **`tools.py`** | The "Hands". Handles SSH connections (Netmiko) and LangChain tool definitions. |
-| **`settings.py`** | Central configuration and path management. |
+| **`agent/`** | The "Brain". Contains the LangGraph state machine, prompts, and router. |
+| **`tools/`** | The "Hands". Handles SSH connections (Netmiko) and robust command parsing. |
 | **`app.py`** | Chainlit Web UI entry point. |
 | **`main.py`** | Terminal CLI entry point. |
 
-### The Workflow (ReAct Loop)
+### Key Features
 
-1. **Understand Node**: The LLM analyzes your request (e.g., "Check VLANs").
+1. **Batching Support**: The agent can configure multiple devices in a single turn.
+    * *User*: "Update NTP server on all switches."
+    * *Agent*: Generates one approval request containing a list of all target devices.
+2. **Safety First**:
+    * Any `config_command` triggers a **Human-in-the-Loop** interrupt.
+    * The Agent cannot execute changes without your explicit "Yes".
+3. **Input Sanitization**:
+    * Automatically cleans up messy LLM outputs (e.g., splitting newline-separated commands into proper lists) before sending to Netmiko.
+
+### The Workflow
+
+1. **Understand Node**: The LLM analyzes your request.
 2. **Routing**:
-    * *Read-Only (Show)*: Routes to **Execute**.
-    * *Config (Change)*: Routes to **Approval** (Interrupts for human permission).
+    * *Read-Only*: Routes directly to **Execute**.
+    * *Config*: Routes to **Approval** (Interrupts for human permission).
 3. **Execute Node**: Runs the command via Netmiko.
-4. **Loop**: The output is fed back to **Understand**, which formats the final answer.
-
-### 🛡️ Security Features
-
-* **Human Approval**: Any command that modifies configuration (`config_command`) requires explicit "Yes/Approve" from the user.
-* **Env Vars**: Passwords are never stored in plain text in the inventory file.
-* **Read-Only Default**: The agent prefers `show_command` unless explicitly asked to configure.
+4. **Loop**: Output is fed back to the LLM to format the final answer.
