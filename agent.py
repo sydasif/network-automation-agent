@@ -11,6 +11,8 @@ from langgraph.prebuilt import ToolNode
 from langgraph.types import StateSnapshot, interrupt
 
 from settings import GROQ_API_KEY, LLM_MAX_TOKENS, LLM_MODEL_NAME, LLM_TEMPERATURE
+
+# Reverted imports to original folder structure
 from tools.commands import config_command, show_command
 from utils.devices import get_all_device_names
 
@@ -18,12 +20,13 @@ from utils.devices import get_all_device_names
 NODE_UNDERSTAND = "understand"
 NODE_APPROVAL = "approval"
 NODE_EXECUTE = "execute"
-NODE_RESPOND = "respond"
+# REMOVED: NODE_RESPOND
 
 RESUME_APPROVED = "approved"
 RESUME_DENIED = "denied"
 
 # --- PROMPTS ---
+# Merged instructions into a single prompt
 UNDERSTAND_PROMPT = """
 You are a network automation assistant.
 
@@ -35,16 +38,13 @@ Rules:
 - Always check device TYPES before issuing commands.
 - If the user asks to CHANGE configuration (create, delete, set, update config), use 'config_command'.
 - If the user asks to SHOW information, use 'show_command'.
+- When receiving tool output, format it as a clean Markdown summary (use tables for lists).
+- Do not output raw JSON.
 
 Available devices: {device_names}
 """
 
-RESPOND_PROMPT = """
-You are a technical documentation assistant.
-Receive raw JSON/Python dictionary output from network devices.
-Convert it into a clean, concise Markdown summary.
-Use tables for lists. Do not include the raw JSON in the output.
-"""
+# REMOVED: RESPOND_PROMPT
 
 
 # --- LLM SETUP ---
@@ -107,11 +107,7 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def respond_node(state: dict[str, Any]) -> dict[str, Any]:
-    messages = state["messages"]
-    synthesis_prompt = SystemMessage(content=RESPOND_PROMPT)
-    response = llm.invoke(messages + [synthesis_prompt])
-    return {"messages": [response]}
+# REMOVED: respond_node function
 
 
 # --- ROUTING ---
@@ -119,10 +115,12 @@ class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
-def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, NODE_RESPOND]:
+def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:
     last_message = state["messages"][-1]
+
+    # If no tool called, we are done. The LLM has already spoken.
     if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
-        return NODE_RESPOND
+        return END  # Changed from NODE_RESPOND to END
 
     tool_name = last_message.tool_calls[0]["name"]
     if tool_name == "config_command":
@@ -131,10 +129,11 @@ def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, NODE_RESPO
     return NODE_EXECUTE
 
 
-def route_approval(state: State) -> Literal[NODE_EXECUTE, NODE_RESPOND]:
+def route_approval(state: State) -> Literal[NODE_EXECUTE, NODE_UNDERSTAND]:
     last_message = state["messages"][-1]
+    # If denied (ToolMessage), loop back to Understand so it can apologize
     if isinstance(last_message, ToolMessage):
-        return NODE_RESPOND
+        return NODE_UNDERSTAND
     return NODE_EXECUTE
 
 
@@ -144,26 +143,28 @@ def create_graph():
     workflow.add_node(NODE_UNDERSTAND, understand_node)
     workflow.add_node(NODE_APPROVAL, approval_node)
     workflow.add_node(NODE_EXECUTE, execute_node)
-    workflow.add_node(NODE_RESPOND, respond_node)
+    # REMOVED: workflow.add_node(NODE_RESPOND, ...)
 
     workflow.set_entry_point(NODE_UNDERSTAND)
 
     workflow.add_conditional_edges(
         NODE_UNDERSTAND,
         route_tools,
-        {NODE_EXECUTE: NODE_EXECUTE, NODE_APPROVAL: NODE_APPROVAL, NODE_RESPOND: NODE_RESPOND},
+        {NODE_EXECUTE: NODE_EXECUTE, NODE_APPROVAL: NODE_APPROVAL, END: END},
     )
     workflow.add_conditional_edges(
-        NODE_APPROVAL, route_approval, {NODE_EXECUTE: NODE_EXECUTE, NODE_RESPOND: NODE_RESPOND}
+        NODE_APPROVAL,
+        route_approval,
+        {NODE_EXECUTE: NODE_EXECUTE, NODE_UNDERSTAND: NODE_UNDERSTAND},
     )
 
-    workflow.add_edge(NODE_EXECUTE, NODE_RESPOND)
-    workflow.add_edge(NODE_RESPOND, END)
+    # LOOP: Execution output goes back to Understand to be formatted
+    workflow.add_edge(NODE_EXECUTE, NODE_UNDERSTAND)
 
     return workflow.compile(checkpointer=MemorySaver())
 
 
-# --- HELPER (Formerly utils/graph.py) ---
+# --- HELPER ---
 def get_approval_request(snapshot: StateSnapshot) -> dict | None:
     if not snapshot.tasks or not snapshot.tasks[0].interrupts:
         return None

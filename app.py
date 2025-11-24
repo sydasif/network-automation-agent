@@ -4,8 +4,15 @@ import chainlit as cl
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
-from agent import NODE_RESPOND, RESUME_APPROVED, RESUME_DENIED, create_graph, get_approval_request
+from agent import (
+    NODE_UNDERSTAND,
+    RESUME_APPROVED,
+    RESUME_DENIED,
+    create_graph,
+    get_approval_request,
+)
 
+# Initialize the graph once at startup
 graph = create_graph()
 
 
@@ -40,8 +47,9 @@ async def on_message(message: cl.Message):
             metadata = event.get("metadata", {})
             node_name = metadata.get("langgraph_node", "")
 
-            # DRY: Use constant NODE_RESPOND
-            if kind == "on_chat_model_stream" and node_name == NODE_RESPOND:
+            # CHANGED: We now listen to NODE_UNDERSTAND for the final answer
+            # because the 'respond' node was removed to simplify the graph.
+            if kind == "on_chat_model_stream" and node_name == NODE_UNDERSTAND:
                 content = event["data"]["chunk"].content
                 if content:
                     if not has_streamed:
@@ -57,17 +65,18 @@ async def on_message(message: cl.Message):
         if has_streamed:
             await final_msg.update()
 
-        # DRY: Use helper function
+        # Check for interrupts (Approvals)
         snapshot = graph.get_state(config)
         tool_call = get_approval_request(snapshot)
 
+        # If no interrupt, the graph is done
         if not tool_call:
             break
 
         tool_name = tool_call.get("name", "Unknown Tool")
         tool_args = tool_call.get("args", {})
 
-        # DRY: Use constants for values and payloads
+        # Ask for user approval via Chainlit UI
         res = await cl.AskActionMessage(
             content=f"⚠️ **Approval Required**\n\nThe agent wants to execute:\n\n**Tool:** `{tool_name}`\n**Args:** `{tool_args}`",
             actions=[
@@ -88,11 +97,10 @@ async def on_message(message: cl.Message):
             ],
         ).send()
 
-        print(f"DEBUG: Chainlit Action Response: {res}")
-
         if res and res.get("name") == "approve":
             resume_value = RESUME_APPROVED
         else:
             resume_value = RESUME_DENIED
 
+        # Resume the graph with the user's decision
         current_input = Command(resume=resume_value)
