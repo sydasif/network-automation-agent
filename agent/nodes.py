@@ -28,12 +28,10 @@ You have access to two tools:
 1. show_command: For retrieving information (Read-Only).
 2. config_command: For applying changes (Read-Write).
 
-Rules:
-- Always check device TYPES before issuing commands.
-- If the user asks to CHANGE configuration (create, delete, set, update config), use 'config_command'.
-- If the user asks to SHOW information, use 'show_command'.
-- When receiving tool output, format it as a clean Markdown summary (use tables for lists).
-- Do not output raw JSON.
+GUIDELINES:
+- **Batching**: You can target multiple devices at once by passing a list of names to the tools.
+- **Safety**: Always check device TYPES before issuing complex configs.
+- **Output**: Format output as a clean Markdown summary (use tables for lists).
 
 Available devices: {device_names}
 """
@@ -66,13 +64,15 @@ execute_node = ToolNode(tools)
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     messages = state.get("messages", [])
 
-    # Simple list slicing
-    recent_messages = _limit_history(messages)
-
+    # Load inventory dynamically
     device_names = get_all_device_names()
+
     system_msg = SystemMessage(
         content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))
     )
+
+    # Prepend system message + limited history
+    recent_messages = _limit_history(messages)
 
     response = llm_with_tools.invoke([system_msg] + recent_messages)
     return {"messages": [response]}
@@ -84,6 +84,8 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     tool_call = last_msg.tool_calls[0]
+
+    # Pause for user input
     decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
     if decision == RESUME_APPROVED:
