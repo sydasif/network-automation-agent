@@ -4,9 +4,7 @@ import uuid
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
-from graph.consts import RESUME_APPROVED, RESUME_DENIED  # <--- NEW IMPORT
-from graph.router import create_graph
-from utils.graph import get_approval_request
+from agent import RESUME_APPROVED, RESUME_DENIED, create_graph, get_approval_request
 
 
 def chat_loop(app) -> None:

@@ -4,11 +4,8 @@ import chainlit as cl
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
-from graph.consts import NODE_RESPOND, RESUME_APPROVED, RESUME_DENIED
-from graph.router import create_graph
-from utils.graph import get_approval_request
+from agent import NODE_RESPOND, RESUME_APPROVED, RESUME_DENIED, create_graph, get_approval_request
 
-# Initialize the graph once at startup
 graph = create_graph()
 
 
