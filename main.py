@@ -6,7 +6,8 @@ import uuid
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
-from agent import RESUME_APPROVED, RESUME_DENIED, create_graph, get_approval_request
+from agent.nodes import RESUME_APPROVED, RESUME_DENIED
+from agent.workflow import create_graph, get_approval_request
 
 
 def run_single_command(app, command: str, device: str = None) -> None:

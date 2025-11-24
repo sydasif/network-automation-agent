@@ -4,13 +4,8 @@ import chainlit as cl
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
-from agent import (
-    NODE_UNDERSTAND,
-    RESUME_APPROVED,
-    RESUME_DENIED,
-    create_graph,
-    get_approval_request,
-)
+from agent.nodes import NODE_UNDERSTAND, RESUME_APPROVED, RESUME_DENIED
+from agent.workflow import create_graph, get_approval_request
 
 graph = create_graph()
 
