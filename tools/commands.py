@@ -1,10 +1,10 @@
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Union
 
 from langchain_core.tools import tool
 
+# UPDATED: Removed ThreadPoolExecutor import
 from utils.devices import get_all_device_names, get_device_connection
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
 
     device_list = [device] if isinstance(device, str) else device
 
-    # REFACTORED: No DB context needed; validation is cleaner
+    # Validation
     all_devs = get_all_device_names()
     invalid = [d for d in device_list if d not in all_devs]
     if invalid:
@@ -26,20 +26,16 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
 
     results = {}
 
-    def _exec(dev_name: str):
+    # KISS: Simple sequential loop
+    # Easy to read, easy to debug. fast enough for <10 devices.
+    for dev_name in device_list:
         try:
             with get_device_connection(dev_name) as conn:
                 output = conn.send_command(command, use_textfsm=True)
-                return dev_name, {"success": True, "data": output}
+                results[dev_name] = {"success": True, "data": output}
         except Exception as e:
-            return dev_name, {"success": False, "error": str(e)}
-
-    max_workers = min(len(device_list), 10)
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_exec, dev): dev for dev in device_list}
-        for future in as_completed(futures):
-            dev, res = future.result()
-            results[dev] = res
+            logger.error(f"Error on {dev_name}: {e}")
+            results[dev_name] = {"success": False, "error": str(e)}
 
     return json.dumps({"command": command, "devices": results}, indent=2)
 
