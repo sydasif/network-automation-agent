@@ -16,6 +16,9 @@ dependencies = [
     "pyyaml>=6.0.2",
     "langmem>=0.0.30",
     "chainlit>=2.9.2",
+    "nornir>=3.5.0",
+    "nornir-netmiko>=1.0.1",
+    "nornir-utils>=0.2.0",
 ]
 
 [tool.ruff]

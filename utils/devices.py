@@ -1,109 +1,102 @@
-"""Device management utilities for the Network AI Agent.
-
-Handles inventory, connections, and the generic execution loop to keep tools DRY.
-"""
+"""Nornir driver and utility functions - KISS implementation."""
 
 import logging
 import os
-from contextlib import contextmanager
-from functools import lru_cache
-from typing import Any, Callable, Dict, Generator, List, Union
+from typing import Any, Dict, List, Union
 
-import yaml
-from netmiko import BaseConnection, ConnectHandler
+from nornir import InitNornir
+from nornir.core.filter import F
 
-from settings import DEVICE_TIMEOUT, INVENTORY_FILE
+from settings import INVENTORY_GROUP_FILE, INVENTORY_HOST_FILE
 
 logger = logging.getLogger(__name__)
 
-# --- INVENTORY & CONNECTION ---
+# Lazy initialization - only create Nornir instance when needed
+_nornir_instance = None
 
 
-@lru_cache(maxsize=1)
-def _load_inventory() -> Dict[str, dict]:
-    """Loads YAML inventory with caching to reduce disk I/O."""
-    if not INVENTORY_FILE.exists():
-        return {}
-    try:
-        with open(INVENTORY_FILE, "r") as f:
-            data = yaml.safe_load(f) or {}
-            return {d["name"]: d for d in data.get("devices", [])}
-    except Exception as e:
-        logger.error(f"Inventory load error: {e}")
-        return {}
+def _get_nornir():
+    """Lazily initialize Nornir instance."""
+    global _nornir_instance
+    if _nornir_instance is None:
+        _nornir_instance = InitNornir(
+            inventory={
+                "plugin": "SimpleInventory",
+                "options": {
+                    "host_file": str(INVENTORY_HOST_FILE),
+                    "group_file": str(INVENTORY_GROUP_FILE),
+                },
+            },
+            runner={
+                "plugin": "threaded",
+                "options": {
+                    "num_workers": 10,
+                },
+            },
+        )
+        _inject_passwords(_nornir_instance)
+    return _nornir_instance
+
+
+def _inject_passwords(nr):
+    """Sets passwords from environment variables."""
+    for name, host in nr.inventory.hosts.items():
+        env_var = host.data.get("password_env_var")
+        if env_var:
+            password = os.environ.get(env_var)
+            if password:
+                host.password = password
+            else:
+                logger.warning(f"Password env var {env_var} not found for {name}")
 
 
 def get_all_device_names() -> List[str]:
-    """Returns a list of all valid device names."""
-    return list(_load_inventory().keys())
+    """Returns list of device names for the LLM prompt."""
+    nr = _get_nornir()
+    return list(nr.inventory.hosts.keys())
 
 
-@contextmanager
-def get_device_connection(device_name: str) -> Generator[BaseConnection, None, None]:
-    """Context manager for establishing a Netmiko connection."""
-    inventory = _load_inventory()
-    dev_conf = inventory.get(device_name)
-
-    if not dev_conf:
-        raise ValueError(f"Device '{device_name}' not found.")
-
-    password = os.environ.get(dev_conf.get("password_env_var", ""))
-    if not password:
-        raise ValueError(f"Password env var missing for {device_name}")
-
-    params = {
-        "device_type": dev_conf["device_type"],
-        "host": dev_conf["host"],
-        "username": dev_conf["username"],
-        "password": password,
-        "timeout": DEVICE_TIMEOUT,
-    }
-
-    conn = None
-    try:
-        conn = ConnectHandler(**params)
-        yield conn
-    except Exception as e:
-        logger.error(f"Connection error {device_name}: {e}")
-        raise e
-    finally:
-        if conn:
-            conn.disconnect()
-
-
-# --- GENERIC EXECUTION HELPER ---
-
-
-def run_action_on_devices(
-    device_input: Union[str, List[str]], action_callback: Callable[[BaseConnection], Any]
+def execute_nornir_task(
+    target_devices: Union[str, List[str]], task_function: callable, **kwargs
 ) -> Dict[str, Any]:
     """
-    Executes a callback function on a list of devices.
-
-    Args:
-        device_input: Single string or list of device names.
-        action_callback: A function that takes a Netmiko connection and returns data.
-
-    Returns:
-        A dictionary with results or an error message.
+    Executes Nornir task on specified devices with simplified result processing.
     """
-    # 1. Normalize Input
-    targets = [device_input] if isinstance(device_input, str) else device_input
+    # Normalize input
+    targets = [target_devices] if isinstance(target_devices, str) else target_devices
+    nr = _get_nornir()
+    all_hosts = list(nr.inventory.hosts.keys())
 
-    # 2. Validate
-    valid_devices = set(get_all_device_names())
-    invalid = [d for d in targets if d not in valid_devices]
+    # Validate devices exist
+    invalid = [t for t in targets if t not in all_hosts]
     if invalid:
-        return {"error": f"Devices not found: {invalid}"}
+        return {"error": f"Devices not found: {invalid}. Available: {all_hosts}"}
 
-    # 3. Execute Loop
-    results = {}
-    for dev in targets:
-        try:
-            with get_device_connection(dev) as conn:
-                output = action_callback(conn)
-                results[dev] = {"success": True, "output": output}
-        except Exception as e:
-            results[dev] = {"success": False, "error": str(e)}
+    # Filter and execute
+    filtered_nr = nr.filter(F(name__any=targets))
+    if not filtered_nr.inventory.hosts:
+        return {
+            "error": f"No matching devices found. Requested: {targets}, Available: {all_hosts}"
+        }
 
-    return results
+    results = filtered_nr.run(task=task_function, **kwargs)
+
+    # Simplified result processing
+    output = {}
+    for hostname, multi_result in results.items():
+        # Get the first result in the chain
+        task_result = multi_result[0] if multi_result else None
+
+        if task_result and task_result.exception:
+            output[hostname] = {"success": False, "error": str(task_result.exception)}
+        else:
+            success = not multi_result.failed
+            output[hostname] = {
+                "success": success,
+                "output": task_result.result if task_result else None,
+                "error": str(task_result.exception)
+                if task_result and task_result.exception
+                else None,
+            }
+
+    return output

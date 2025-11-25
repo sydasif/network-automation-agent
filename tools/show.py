@@ -1,12 +1,12 @@
-"""Read-only network tools."""
+"""Read-only network tools using Nornir."""
 
 import json
 from typing import Union
 
 from langchain_core.tools import tool
-from netmiko import BaseConnection
+from nornir_netmiko.tasks import netmiko_send_command
 
-from utils.devices import run_action_on_devices
+from utils.devices import execute_nornir_task
 
 
 @tool
@@ -15,15 +15,16 @@ def show_command(device: Union[str, list[str]], command: str) -> str:
     if not command or not command.strip():
         return json.dumps({"error": "Command cannot be empty."})
 
-    # Define the specific logic for this tool
-    def _action(conn: BaseConnection):
-        # use_textfsm=True allows structured output if templates exist
-        return conn.send_command(command, use_textfsm=True)
+    # Execute using the Nornir wrapper
+    # we pass use_textfsm=True to netmiko via Nornir
+    results = execute_nornir_task(
+        target_devices=device,
+        task_function=netmiko_send_command,
+        command_string=command,
+        use_textfsm=True,
+    )
 
-    # Offload the execution to the utility
-    results = run_action_on_devices(device, _action)
-
-    # Handle top-level validation errors from the utility
+    # Handle top-level validation errors
     if "error" in results and len(results) == 1:
         return json.dumps(results)
 

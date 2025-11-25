@@ -16,8 +16,11 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 """The base directory of the project."""
 
-INVENTORY_FILE = BASE_DIR / "hosts.yaml"
+INVENTORY_HOST_FILE = BASE_DIR / "hosts.yaml"
 """Path to the hosts.yaml inventory file."""
+
+INVENTORY_GROUP_FILE = BASE_DIR / "groups.yaml"
+"""Path to the groups.yaml inventory file."""
 
 # LLM Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")

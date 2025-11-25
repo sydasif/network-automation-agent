@@ -1568,6 +1568,9 @@ dependencies = [
     { name = "langgraph" },
     { name = "langmem" },
     { name = "netmiko" },
+    { name = "nornir" },
+    { name = "nornir-netmiko" },
+    { name = "nornir-utils" },
     { name = "ntc-templates" },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -1588,6 +1591,9 @@ requires-dist = [
     { name = "langgraph", specifier = ">=0.2.0" },
     { name = "langmem", specifier = ">=0.0.30" },
     { name = "netmiko", specifier = ">=4.4.0" },
+    { name = "nornir", specifier = ">=3.5.0" },
+    { name = "nornir-netmiko", specifier = ">=1.0.1" },
+    { name = "nornir-utils", specifier = ">=0.2.0" },
     { name = "ntc-templates", specifier = ">=5.1.0" },
     { name = "pydantic", specifier = ">=2.9.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
@@ -1597,6 +1603,44 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.14.6" }]
+
+[[package]]
+name = "nornir"
+version = "3.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ruamel-yaml" },
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1a/e9/deda49010c698dc97f66fa93828686546c08127866b6c00a94078d4ef547/nornir-3.5.0.tar.gz", hash = "sha256:f0d212999a37bc5962534738c47099b3e11a45d8f7dc8bc855530f7fb73d2f64", size = 28730, upload-time = "2025-01-08T18:08:10.572Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5b/5b/2555603edbd02226c037822234830f6de837da53e1c0cd6018fc944c1d50/nornir-3.5.0-py3-none-any.whl", hash = "sha256:7e273d7b2aa519fa84b4fbbeb74ac5df3595d80105009049f0157c72a345b0b2", size = 30592, upload-time = "2025-01-08T18:08:04.668Z" },
+]
+
+[[package]]
+name = "nornir-netmiko"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "netmiko" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/94/00/ddd0b87d3493f7c853798d86f3b37fbb7decc4b5b30bd473e0f4565bc96d/nornir_netmiko-1.0.1.tar.gz", hash = "sha256:498546df001e0e499f10c5646d1356e361ccbb165b1335b89cfe8f19765e24d7", size = 7838, upload-time = "2023-12-07T18:18:34.364Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/16/63764c64087f14b2cd66f205da8570dfc13887ec43aa668de0c55a3ff92b/nornir_netmiko-1.0.1-py3-none-any.whl", hash = "sha256:eaee2944ad386b40c0719e8ac393ac63d531f44fb9a07d660bae7de430f12834", size = 11518, upload-time = "2023-12-07T18:18:33.369Z" },
+]
+
+[[package]]
+name = "nornir-utils"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama" },
+    { name = "nornir" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/46/fa/4e96cf440083973ea32bd95779fbed33e7d84015f898e4aef22f6a3bcb1b/nornir_utils-0.2.0.tar.gz", hash = "sha256:4de6aaa35e5c1a98e1c84db84a008b0b1e974dc65d88484f2dcea3e30c95fbc2", size = 10361, upload-time = "2022-04-09T09:32:46.274Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5d/14/89c3097801544249052c6a89ad5a9a65035ccddb3aae1948854545ea8f2e/nornir_utils-0.2.0-py3-none-any.whl", hash = "sha256:b4c430793a74f03affd5ff2d90abc8c67a28c7ff325f48e3a01a9a44ec71b844", size = 15157, upload-time = "2022-04-09T09:32:44.717Z" },
+]
 
 [[package]]
 name = "ntc-templates"
@@ -3114,6 +3158,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d6/1c/d213e1c6651d0bd37636b21b1ba9b895f276e8057f882c9f944931e4f002/scp-0.15.0.tar.gz", hash = "sha256:f1b22e9932123ccf17eebf19e0953c6e9148f589f93d91b872941a696305c83f", size = 13905, upload-time = "2024-05-23T21:37:41.835Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/79/b3/561cd6afa959e9dd522af12acc4f803e8bab1bd0e383bffc5211721c5fcb/scp-0.15.0-py2.py3-none-any.whl", hash = "sha256:9e7f721e5ac563c33eb0831d0f949c6342f1c28c3bdc3b02f39d77b5ea20df7e", size = 8753, upload-time = "2024-05-23T21:37:46.226Z" },
+]
+
+[[package]]
+name = "setuptools"
+version = "80.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958, upload-time = "2025-05-27T00:56:51.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486, upload-time = "2025-05-27T00:56:49.664Z" },
 ]
 
 [[package]]
