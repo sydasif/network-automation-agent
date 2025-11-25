@@ -33,6 +33,7 @@ def _get_nornir():
                     "num_workers": 10,
                 },
             },
+            logging={"enabled": False},  # Disable Nornir's internal logging
         )
         _inject_passwords(_nornir_instance)
     return _nornir_instance
