@@ -1,8 +1,8 @@
+# Network AI Agent
+
 <div align="center">
 
 <img src="https://github.com/sydasif/sydasif.github.io/blob/main/assets/img/favicons/favicon-96x96.png" alt="Network AI Agent Logo" width="120"/>
-
-# Network AI Agent
 
 **A powerful, AI-driven CLI tool for seamless network automation and management.**
 
@@ -14,7 +14,7 @@
 
 </div>
 
-A lightweight, "Human-in-the-Loop" AI agent that translates natural language into network configuration and show commands. Built with **LangGraph**, **Netmiko**, and **Chainlit**.
+A lightweight, "Human-in-the-Loop" AI agent that translates natural language into network configuration and show commands. Built with **LangGraph**, **Nornir**, **Netmiko**, and **Chainlit**.
 
 ## ⚡ Quick Start
 
@@ -43,18 +43,34 @@ DEVICE_PASSWORD=your_secure_password
 **Create `hosts.yaml`:**
 
 ```yaml
-devices:
-  - name: sw1
-    host: 192.168.1.10
-    username: admin
+---
+sw1:
+  hostname: 192.168.121.102
+  groups: [cisco]
+  data:
     password_env_var: DEVICE_PASSWORD
-    device_type: cisco_ios
+sw2:
+  hostname: 192.168.121.103
+  groups: [cisco]
+  data:
+    password_env_var: DEVICE_PASSWORD
+r1:
+  hostname: 192.168.121.101
+  groups: [arista]
+  data:
+    password_env_var: DEVICE_PASSWORD
+```
 
-  - name: rtr1
-    host: 192.168.1.1
-    username: cisco
-    password_env_var: DEVICE_PASSWORD
-    device_type: cisco_xe
+**Create `groups.yaml`:**
+
+```yaml
+---
+cisco:
+  platform: cisco_ios
+  username: admin
+arista:
+  platform: arista_eos
+  username: admin
 ```
 
 ### 3. Usage
@@ -87,7 +103,7 @@ The project follows a flattened, **KISS** architecture:
 | File | Purpose |
 | :--- | :--- |
 | **`agent/`** | The "Brain". Contains the LangGraph state machine, prompts, and router. |
-| **`tools/`** | The "Hands". Handles SSH connections (Netmiko) and robust command parsing. |
+| **`tools/`** | The "Hands". Handles SSH connections (Nornir/Netmiko) and robust command parsing. |
 | **`utils/devices.py`** | Device inventory management and connection handling. |
 | **`app.py`** | Chainlit Web UI entry point. |
 | **`main.py`** | Terminal CLI entry point. |
@@ -103,6 +119,8 @@ The project follows a flattened, **KISS** architecture:
     * The Agent cannot execute changes without your explicit "Yes".
 3. **Input Sanitization**:
     * Automatically cleans up messy LLM outputs (e.g., splitting newline-separated commands into proper lists) before sending to Netmiko.
+4. **Structured Output**:
+    * Uses TextFSM to parse `show` command output into structured JSON.
 
 ### The Workflow
 
@@ -110,7 +128,7 @@ The project follows a flattened, **KISS** architecture:
 2. **Routing**:
     * *Read-Only*: Routes directly to **Execute**.
     * *Config*: Routes to **Approval** (Interrupts for human permission).
-3. **Execute Node**: Runs the command via Netmiko.
+3. **Execute Node**: Runs the command via Nornir/Netmiko.
 4. **Loop**: Output is fed back to the LLM to format the final answer.
 
 ---
@@ -119,22 +137,23 @@ The project follows a flattened, **KISS** architecture:
 
 ### Modules
 
-- **`agent.nodes`**: Defines the graph state, constants, and node logic for the LangGraph workflow
-- **`agent.router`**: Contains routing logic for conditional edges in the workflow
-- **`agent.workflow`**: Assembles the complete LangGraph workflow
-- **`tools.commands`**: Network command tools for show and configuration commands
-- **`utils.devices`**: Handles device inventory loading and connection management
-- **`settings`**: Contains configuration settings for the application
-- **`app`**: Chainlit web interface entry point
-- **`main`**: CLI entry point
+* **`agent.nodes`**: Defines the graph state, constants, and node logic for the LangGraph workflow
+* **`agent.router`**: Contains routing logic for conditional edges in the workflow
+* **`agent.workflow`**: Assembles the complete LangGraph workflow
+* **`tools.show`**: Network tools for read-only 'show' commands.
+* **`tools.config`**: Network tools for configuration commands.
+* **`utils.devices`**: Handles device inventory loading and connection management
+* **`settings`**: Contains configuration settings for the application
+* **`app`**: Chainlit web interface entry point
+* **`main`**: CLI entry point
 
 ### Key Functions
 
-- `run_single_command()`: Execute a single network command through the agent workflow
-- `create_graph()`: Creates and compiles the LangGraph workflow
-- `show_command()`: Execute read-only 'show' commands on network devices
-- `config_command()`: Apply configuration changes to network devices
-- `get_device_connection()`: Context manager for establishing device connections
+* `run_single_command()`: Execute a single network command through the agent workflow
+* `create_graph()`: Creates and compiles the LangGraph workflow
+* `show_command()`: Execute read-only 'show' commands on network devices
+* `config_command()`: Apply configuration changes to network devices
+* `execute_nornir_task()`: Wrapper for executing Nornir tasks.
 
 ---
 
@@ -183,9 +202,9 @@ ruff format .
 
 ### Prerequisites
 
-- Python 3.12+
-- `uv` package manager or `pip`
-- Network device access (SSH)
+* Python 3.12+
+* `uv` package manager or `pip`
+* Network device access (SSH)
 
 ### Production Deployment
 
