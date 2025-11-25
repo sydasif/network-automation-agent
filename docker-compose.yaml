@@ -1,0 +1,15 @@
+services:
+  network-agent:
+    build: .
+    container_name: network-agent
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mounts your current directory to /app in the container
+      # This allows you to edit code locally and see changes instantly
+      - .:/app
+    env_file:
+      # Loads your API keys and device passwords securely
+      - .env
+    # Optional: Restart policy
+    restart: unless-stopped
