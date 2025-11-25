@@ -1,92 +1,109 @@
 """Device management utilities for the Network AI Agent.
 
-This module handles device inventory loading and connection management
-for network devices using Netmiko.
+Handles inventory, connections, and the generic execution loop to keep tools DRY.
 """
 
 import logging
 import os
 from contextlib import contextmanager
-from typing import Dict, Generator, List
+from functools import lru_cache
+from typing import Any, Callable, Dict, Generator, List, Union
 
 import yaml
 from netmiko import BaseConnection, ConnectHandler
 
 from settings import DEVICE_TIMEOUT, INVENTORY_FILE
 
+logger = logging.getLogger(__name__)
 
+# --- INVENTORY & CONNECTION ---
+
+
+@lru_cache(maxsize=1)
 def _load_inventory() -> Dict[str, dict]:
-    """Loads the YAML inventory from the hosts.yaml file.
-
-    Returns:
-        A dictionary mapping device names to their configuration dictionaries.
-        Returns an empty dictionary if the inventory file doesn't exist.
-    """
+    """Loads YAML inventory with caching to reduce disk I/O."""
     if not INVENTORY_FILE.exists():
         return {}
-
-    with open(INVENTORY_FILE, "r") as f:
-        data = yaml.safe_load(f) or {}
-
-    return {d["name"]: d for d in data.get("devices", [])}
+    try:
+        with open(INVENTORY_FILE, "r") as f:
+            data = yaml.safe_load(f) or {}
+            return {d["name"]: d for d in data.get("devices", [])}
+    except Exception as e:
+        logger.error(f"Inventory load error: {e}")
+        return {}
 
 
 def get_all_device_names() -> List[str]:
-    """Retrieves a list of all device names from the inventory.
-
-    Returns:
-        A list of strings containing all device names in the inventory.
-    """
+    """Returns a list of all valid device names."""
     return list(_load_inventory().keys())
 
 
 @contextmanager
 def get_device_connection(device_name: str) -> Generator[BaseConnection, None, None]:
-    """Context manager to establish and manage a connection to a network device.
+    """Context manager for establishing a Netmiko connection."""
+    inventory = _load_inventory()
+    dev_conf = inventory.get(device_name)
 
-    Args:
-        device_name: The name of the device to connect to, as defined in the inventory.
+    if not dev_conf:
+        raise ValueError(f"Device '{device_name}' not found.")
 
-    Yields:
-        A Netmiko BaseConnection object for the connected device.
+    password = os.environ.get(dev_conf.get("password_env_var", ""))
+    if not password:
+        raise ValueError(f"Password env var missing for {device_name}")
 
-    Raises:
-        ValueError: If the device is not found in the inventory or if the
-            password environment variable is not set.
-        Exception: If there's an error connecting to the device.
-    """
+    params = {
+        "device_type": dev_conf["device_type"],
+        "host": dev_conf["host"],
+        "username": dev_conf["username"],
+        "password": password,
+        "timeout": DEVICE_TIMEOUT,
+    }
+
     conn = None
     try:
-        inventory = _load_inventory()
-        # Get device configuration from inventory
-        dev_conf = inventory.get(device_name)
-
-        if not dev_conf:
-            raise ValueError(f"Device {device_name} not found.")
-
-        # Retrieve password from environment variable specified in inventory
-        password = os.environ.get(dev_conf["password_env_var"])
-        if not password:
-            raise ValueError(f"Password env var not set for {device_name}")
-
-        # Prepare connection parameters
-        params = {
-            "device_type": dev_conf["device_type"],
-            "host": dev_conf["host"],
-            "username": dev_conf["username"],
-            "password": password,
-            "timeout": DEVICE_TIMEOUT,
-        }
-
-        # Establish the connection to the device
         conn = ConnectHandler(**params)
         yield conn
-
     except Exception as e:
-        logging.getLogger(__name__).error(f"Connection error on {device_name}: {e}")
+        logger.error(f"Connection error {device_name}: {e}")
         raise e
     finally:
-        # Ensure connection is properly closed even if an exception occurs
         if conn:
             conn.disconnect()
 
+
+# --- GENERIC EXECUTION HELPER ---
+
+
+def run_action_on_devices(
+    device_input: Union[str, List[str]], action_callback: Callable[[BaseConnection], Any]
+) -> Dict[str, Any]:
+    """
+    Executes a callback function on a list of devices.
+
+    Args:
+        device_input: Single string or list of device names.
+        action_callback: A function that takes a Netmiko connection and returns data.
+
+    Returns:
+        A dictionary with results or an error message.
+    """
+    # 1. Normalize Input
+    targets = [device_input] if isinstance(device_input, str) else device_input
+
+    # 2. Validate
+    valid_devices = set(get_all_device_names())
+    invalid = [d for d in targets if d not in valid_devices]
+    if invalid:
+        return {"error": f"Devices not found: {invalid}"}
+
+    # 3. Execute Loop
+    results = {}
+    for dev in targets:
+        try:
+            with get_device_connection(dev) as conn:
+                output = action_callback(conn)
+                results[dev] = {"success": True, "output": output}
+        except Exception as e:
+            results[dev] = {"success": False, "error": str(e)}
+
+    return results

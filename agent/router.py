@@ -10,7 +10,7 @@ from langchain_core.messages import ToolMessage
 from langgraph.graph import END
 
 from agent.nodes import NODE_APPROVAL, NODE_EXECUTE, NODE_UNDERSTAND, State
-from tools.commands import config_command
+from tools.config import config_command
 
 
 def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:

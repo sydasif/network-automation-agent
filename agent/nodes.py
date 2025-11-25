@@ -13,19 +13,20 @@ from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
 from settings import GROQ_API_KEY, LLM_MODEL_NAME, LLM_TEMPERATURE, MAX_HISTORY_MESSAGES
-from tools.commands import config_command, show_command
+from tools.config import config_command
+from tools.show import show_command
 from utils.devices import get_all_device_names
 
 # --- NODE CONSTANTS ---
 # These constants represent the different nodes in the workflow graph
 NODE_UNDERSTAND = "understand"  # LLM node that understands user requests and selects tools
-NODE_APPROVAL = "approval"      # Human approval node for sensitive operations
-NODE_EXECUTE = "execute"        # Tool execution node that runs selected tools on devices
+NODE_APPROVAL = "approval"  # Human approval node for sensitive operations
+NODE_EXECUTE = "execute"  # Tool execution node that runs selected tools on devices
 
 # --- APPROVAL RESUME CONSTANTS ---
 # These constants represent the values returned when resuming from approval interruption
-RESUME_APPROVED = "approved"    # Value returned when user approves an action
-RESUME_DENIED = "denied"        # Value returned when user denies an action
+RESUME_APPROVED = "approved"  # Value returned when user approves an action
+RESUME_DENIED = "denied"  # Value returned when user denies an action
 
 # --- PROMPTS ---
 UNDERSTAND_PROMPT = """
@@ -51,6 +52,7 @@ class State(TypedDict):
     Attributes:
         messages: A list of messages in the conversation history.
     """
+
     messages: Annotated[list, add_messages]
 
 
