@@ -26,14 +26,17 @@ INVENTORY_GROUP_FILE = BASE_DIR / "groups.yaml"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 """API key for GROQ LLM service."""
 
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-120b")
+# SWITCHED TO 8B INSTANT TO AVOID RATE LIMITS & IMPROVE SPEED
+# We prefer the env var, but if you are hitting limits, please unset LLM_MODEL_NAME in .env
+# or change it to "llama-3.1-8b-instant"
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "llama-3.1-8b-instant")
 """Name of the LLM model to use for processing requests."""
 
-LLM_TEMPERATURE = 0.2
-"""Temperature setting for the LLM model."""
+LLM_TEMPERATURE = 0.0
+"""Temperature setting for the LLM model. 0.0 is best for tool use."""
 
-# KISS: Simple message count limit instead of token counting
-MAX_HISTORY_MESSAGES = 20
+# Reduce history to save tokens
+MAX_HISTORY_MESSAGES = 10
 """Maximum number of messages to keep in history for context."""
 
 # Network Device Settings

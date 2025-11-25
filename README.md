@@ -36,7 +36,7 @@ Create your secrets and inventory files.
 
 ```ini
 GROQ_API_KEY=gsk_your_api_key_here
-LLM_MODEL_NAME=llama-3.3-70b-versatile
+LLM_MODEL_NAME=openai/gpt-oss-20b
 DEVICE_PASSWORD=your_secure_password
 ```
 
