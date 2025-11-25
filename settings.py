@@ -26,7 +26,7 @@ INVENTORY_GROUP_FILE = BASE_DIR / "groups.yaml"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 """API key for GROQ LLM service."""
 
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-20b")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-120b")
 """Name of the LLM model to use for processing requests."""
 
 LLM_TEMPERATURE = 0.2

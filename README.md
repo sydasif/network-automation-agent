@@ -36,7 +36,7 @@ Create your secrets and inventory files.
 
 ```ini
 GROQ_API_KEY=gsk_your_api_key_here
-LLM_MODEL_NAME=llama3-70b-8192
+LLM_MODEL_NAME=llama-3.3-70b-versatile
 DEVICE_PASSWORD=your_secure_password
 ```
 
