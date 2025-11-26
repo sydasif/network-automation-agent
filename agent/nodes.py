@@ -1,8 +1,4 @@
-"""Agent nodes definition for the Network AI Agent.
-
-This module defines the state, constants, and node logic for the LangGraph workflow.
-It includes the understanding node, approval node, and supporting utilities.
-"""
+"""Agent nodes definition for the Network AI Agent."""
 
 import logging
 from typing import Annotated, Any, TypedDict
@@ -14,9 +10,11 @@ from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
 from settings import GROQ_API_KEY, LLM_MODEL_NAME, LLM_TEMPERATURE, MAX_HISTORY_MESSAGES
+
+# Import the UPDATED tools (which now have Pydantic schemas)
 from tools.config import config_command
 from tools.show import show_command
-from utils.devices import get_all_device_names
+from utils.devices import get_device_info
 
 logger = logging.getLogger(__name__)
 
@@ -24,120 +22,91 @@ logger = logging.getLogger(__name__)
 NODE_UNDERSTAND = "understand"
 NODE_APPROVAL = "approval"
 NODE_EXECUTE = "execute"
-
-# --- APPROVAL RESUME CONSTANTS ---
 RESUME_APPROVED = "approved"
 RESUME_DENIED = "denied"
 
-# --- PROMPTS ---
+# --- PROMPT ---
+# Updated to include platform information for better command generation
 UNDERSTAND_PROMPT = """
 You are a network automation assistant.
 
-**Available Devices:**
-{device_names}
+**Network Inventory (Name & Platform):**
+{device_inventory}
 
-**Tools:**
-1. `show_command`: For read-only output (show, list, get).
-   - Args: `devices` (list of str), `command` (str)
-2. `config_command`: For configuration changes (set, create, delete).
-   - Args: `devices` (list of str), `configs` (list of str)
-
-**Examples:**
-- User: "Show version on sw1"
-  Call: show_command(devices=["sw1"], command="show version")
-
-- User: "Create vlan 10 on sw1 and sw2"
-  Call: config_command(devices=["sw1", "sw2"], configs=["vlan 10"])
-
-**Guidelines:**
-1. Always check 'Available Devices'. Do not use device names that are not listed.
-2. If multiple config lines are needed, pass them as a list to `config_command`.
-3. If the user intention is unclear, ask for clarification.
+**Instructions:**
+1. Look at the 'Platform' in the inventory above.
+2. Ensure the commands you generate are valid for that specific platform (e.g., do not use 'write mem' on Juniper).
+3. Use 'show_command' for reading data.
+4. Use 'config_command' for changing settings.
 """
 
 
-# --- STATE DEFINITION ---
+# --- STATE ---
 class State(TypedDict):
-    """Defines the state structure for the LangGraph workflow."""
-
     messages: Annotated[list, add_messages]
 
 
-# --- LLM SETUP ---
+# --- LLM & TOOLS ---
 def _create_llm():
     if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY not set in environment")
+        raise RuntimeError("GROQ_API_KEY not set")
     return ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY)
 
 
-def _limit_history(messages: list) -> list:
-    return messages[-MAX_HISTORY_MESSAGES:]
-
-
 llm = _create_llm()
-# Bind tools to the LLM
+
+# THIS IS THE MAGIC PART:
+# By binding these tools, the Pydantic schemas are automatically sent to the LLM.
+# The LLM now knows exactly what pattern to use.
 tools = [show_command, config_command]
 llm_with_tools = llm.bind_tools(tools)
+
 execute_node = ToolNode(tools)
 
 
 # --- NODES ---
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
-    """Processes user requests and selects appropriate tools for execution."""
+    """The Brain: Decides which tool to call."""
     messages = state.get("messages", [])
 
-    # Load inventory dynamically
-    device_names = get_all_device_names()
+    # FETCH THE SMART DATA (includes platform info)
+    inventory_str = get_device_info()
 
-    # Fallback if inventory is empty
-    if not device_names:
-        device_names = ["No devices found in inventory"]
+    if not inventory_str:
+        inventory_str = "No devices found."
 
-    system_msg = SystemMessage(
-        content=UNDERSTAND_PROMPT.format(device_names=", ".join(device_names))
-    )
+    # INJECT IT INTO THE BRAIN
+    system_msg = SystemMessage(content=UNDERSTAND_PROMPT.format(device_inventory=inventory_str))
 
-    recent_messages = _limit_history(messages)
+    # Keep context short
+    recent_messages = messages[-MAX_HISTORY_MESSAGES:]
 
     try:
-        # Invoke LLM
+        # The LLM will now generate the correct pattern automatically
         response = llm_with_tools.invoke([system_msg] + recent_messages)
         return {"messages": [response]}
 
     except Exception as e:
-        error_msg = str(e)
-        logger.error(f"LLM Invocation failed: {error_msg}")
+        logger.error(f"LLM Error: {e}")
+        # Graceful error handling
+        if "429" in str(e):
+            msg = "⚠️ Rate limit reached. Please wait or switch models."
+        else:
+            msg = "I encountered an error. Please try again."
 
-        if "429" in error_msg:
-            return {
-                "messages": [
-                    AIMessage(
-                        content="⚠️ **Rate Limit Exceeded**: The AI model is currently overloaded. Please wait a moment or switch to a smaller model (e.g., llama-3.1-8b-instant)."
-                    )
-                ]
-            }
-
-        # Generic fallback
-        return {
-            "messages": [
-                AIMessage(
-                    content="I encountered an error processing your request. Please try again."
-                )
-            ]
-        }
+        return {"messages": [AIMessage(content=msg)]}
 
 
 def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
-    """Handles human approval for configuration changes."""
+    """The Gatekeeper: Asks for permission."""
     last_msg = state["messages"][-1]
 
-    # Check if the last message contains tool calls that require approval
     if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
         return None
 
     tool_call = last_msg.tool_calls[0]
 
-    # Pause execution to request user approval
+    # Interrupt execution to ask the user
     decision = interrupt({"type": "approval_request", "tool_call": tool_call})
 
     if decision == RESUME_APPROVED:
@@ -147,7 +116,7 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
         "messages": [
             ToolMessage(
                 tool_call_id=tool_call["id"],
-                content=f"❌ User denied permission to execute: {tool_call['name']}",
+                content=f"❌ User denied permission: {tool_call['name']}",
             )
         ]
     }

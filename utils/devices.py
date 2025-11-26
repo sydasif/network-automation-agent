@@ -57,6 +57,24 @@ def get_all_device_names() -> List[str]:
     return list(nr.inventory.hosts.keys())
 
 
+def get_device_info() -> str:
+    """
+    Returns a formatted string of devices and their platforms.
+    Example output:
+    - sw1 (Platform: cisco_ios)
+    - sw2 (Platform: arista_eos)
+    """
+    nr = _get_nornir()
+    info_list = []
+
+    for name, host in nr.inventory.hosts.items():
+        # Get platform, default to "unknown" if missing
+        platform = host.platform or "unknown"
+        info_list.append(f"- {name} (Platform: {platform})")
+
+    return "\n".join(info_list)
+
+
 def execute_nornir_task(
     target_devices: Union[str, List[str]], task_function: callable, **kwargs
 ) -> Dict[str, Any]:
