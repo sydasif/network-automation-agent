@@ -1,7 +1,7 @@
 """Read-only network tools using Nornir."""
 
 import json
-from typing import List, Union
+from typing import Union
 
 from langchain_core.tools import tool
 from nornir_netmiko.tasks import netmiko_send_command
@@ -16,15 +16,15 @@ class ShowInput(BaseModel):
 
     # We allow Union[str, List] here so the LLM API doesn't throw a validation error
     # if the model outputs a single string.
-    devices: Union[str, List[str]] = Field(
-        description="List of device hostnames (e.g., ['sw1', 'sw2']) or a single device name."
+    devices: Union[str, list[str]] = Field(
+        description="List of device hostnames (e.g., ['sw1', 'sw2']) or a single device name.",
     )
     command: str = Field(description="The show command to execute (e.g., 'show ip int brief').")
 
     # This validator ensures the Python code ALWAYS receives a List,
     # even if the LLM sent a string.
     @field_validator("devices", mode="before")
-    def parse_devices(cls, v):
+    def parse_devices(cls, v: Union[str, list[str]]) -> list[str]:
         if isinstance(v, str):
             return [v]  # Wrap single string in a list
         return v
@@ -32,9 +32,8 @@ class ShowInput(BaseModel):
 
 # --- TOOL DEFINITION ---
 @tool(args_schema=ShowInput)
-def show_command(devices: List[str], command: str) -> str:
+def show_command(devices: list[str], command: str) -> str:
     """Execute a read-only 'show' command on one or more devices."""
-
     if not command or not command.strip():
         return json.dumps({"error": "Command cannot be empty."})
 

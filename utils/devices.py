@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 
 from nornir import InitNornir
 from nornir.core.filter import F
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _nornir_instance = None
 
 
-def _get_nornir():
+def _get_nornir() -> InitNornir:
     """Lazily initialize Nornir instance."""
     global _nornir_instance
     if _nornir_instance is None:
@@ -39,8 +39,8 @@ def _get_nornir():
     return _nornir_instance
 
 
-def _inject_passwords(nr):
-    """Sets passwords from environment variables."""
+def _inject_passwords(nr) -> None:
+    """Set passwords from environment variables."""
     for name, host in nr.inventory.hosts.items():
         env_var = host.data.get("password_env_var")
         if env_var:
@@ -48,22 +48,17 @@ def _inject_passwords(nr):
             if password:
                 host.password = password
             else:
-                logger.warning(f"Password env var {env_var} not found for {name}")
+                logger.warning("Password env var %s not found for %s", env_var, name)
 
 
-def get_all_device_names() -> List[str]:
-    """Returns list of device names for the LLM prompt."""
+def get_all_device_names() -> list[str]:
+    """Return list of device names for the LLM prompt."""
     nr = _get_nornir()
     return list(nr.inventory.hosts.keys())
 
 
 def get_device_info() -> str:
-    """
-    Returns a formatted string of devices and their platforms.
-    Example output:
-    - sw1 (Platform: cisco_ios)
-    - sw2 (Platform: arista_eos)
-    """
+    """Return a formatted string of devices and their platforms."""
     nr = _get_nornir()
     info_list = []
 
@@ -76,11 +71,11 @@ def get_device_info() -> str:
 
 
 def execute_nornir_task(
-    target_devices: Union[str, List[str]], task_function: callable, **kwargs
-) -> Dict[str, Any]:
-    """
-    Executes Nornir task on specified devices with simplified result processing.
-    """
+    target_devices: Union[str, list[str]],
+    task_function: callable,
+    **kwargs,
+) -> dict[str, Any]:
+    """Execute Nornir task on specified devices with simplified result processing."""
     # Normalize input
     targets = [target_devices] if isinstance(target_devices, str) else target_devices
     nr = _get_nornir()
@@ -95,7 +90,7 @@ def execute_nornir_task(
     filtered_nr = nr.filter(F(name__any=targets))
     if not filtered_nr.inventory.hosts:
         return {
-            "error": f"No matching devices found. Requested: {targets}, Available: {all_hosts}"
+            "error": f"No matching devices found. Requested: {targets}, Available: {all_hosts}",
         }
 
     results = filtered_nr.run(task=task_function, **kwargs)

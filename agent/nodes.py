@@ -35,7 +35,8 @@ You are a network automation assistant.
 
 **Instructions:**
 1. Look at the 'Platform' in the inventory above.
-2. Ensure the commands you generate are valid for that specific platform (e.g., do not use 'write mem' on Juniper).
+2. Ensure the commands you generate are valid for that specific platform
+   (e.g., do not use 'write mem' on Juniper).
 3. Use 'show_command' for reading data.
 4. Use 'config_command' for changing settings.
 """
@@ -43,11 +44,13 @@ You are a network automation assistant.
 
 # --- STATE ---
 class State(TypedDict):
+    """State structure for the LangGraph workflow."""
+
     messages: Annotated[list, add_messages]
 
 
 # --- LLM & TOOLS ---
-def _create_llm():
+def _create_llm() -> ChatGroq:
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY not set")
     return ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY)
@@ -66,7 +69,7 @@ execute_node = ToolNode(tools)
 
 # --- NODES ---
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
-    """The Brain: Decides which tool to call."""
+    """Decide which tool to call."""
     messages = state.get("messages", [])
 
     # FETCH THE SMART DATA (includes platform info)
@@ -87,7 +90,7 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         return {"messages": [response]}
 
     except Exception as e:
-        logger.error(f"LLM Error: {e}")
+        logger.error("LLM Error: %s", e)
         # Graceful error handling
         if "429" in str(e):
             msg = "⚠️ Rate limit reached. Please wait or switch models."
@@ -98,7 +101,7 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
-    """The Gatekeeper: Asks for permission."""
+    """Ask for permission."""
     last_msg = state["messages"][-1]
 
     if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
@@ -118,5 +121,5 @@ def approval_node(state: dict[str, Any]) -> dict[str, Any] | None:
                 tool_call_id=tool_call["id"],
                 content=f"❌ User denied permission: {tool_call['name']}",
             )
-        ]
+        ],
     }
