@@ -8,8 +8,9 @@ from langchain_groq import ChatGroq
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
+from langchain_core.runnables import RunnableWithFallbacks
 
-from settings import GROQ_API_KEY, LLM_MODEL_NAME, LLM_TEMPERATURE, MAX_HISTORY_MESSAGES
+from settings import GROQ_API_KEY, LLM_MODEL_NAME, LLM_FALLBACK_MODELS, LLM_TEMPERATURE, MAX_HISTORY_MESSAGES
 
 # Import the UPDATED tools (which now have Pydantic schemas)
 from tools.config import config_command
@@ -50,13 +51,39 @@ class State(TypedDict):
 
 
 # --- LLM & TOOLS ---
-def _create_llm() -> ChatGroq:
+def _create_primary_llm() -> ChatGroq:
+    """Create the primary LLM instance."""
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY not set")
     return ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY)
 
 
-llm = _create_llm()
+def _create_fallback_llm(model_name: str) -> ChatGroq:
+    """Create a fallback LLM instance."""
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY not set")
+    return ChatGroq(temperature=LLM_TEMPERATURE, model_name=model_name, api_key=GROQ_API_KEY)
+
+
+def _create_llm_with_fallbacks() -> RunnableWithFallbacks:
+    """Create an LLM with fallback models.
+
+    Creates a primary LLM and adds fallback models that will be used
+    if the primary model fails due to rate limits, outages, etc.
+    """
+    # Create the primary LLM
+    primary_llm = _create_primary_llm()
+
+    # Create fallback LLMs based on the configuration
+    fallback_llms = [_create_fallback_llm(model_name) for model_name in LLM_FALLBACK_MODELS]
+
+    # Build the fallback chain using with_fallbacks method
+    llm_with_fallbacks = primary_llm.with_fallbacks(fallbacks=fallback_llms)
+
+    return llm_with_fallbacks
+
+
+llm = _create_llm_with_fallbacks()
 
 # THIS IS THE MAGIC PART:
 # By binding these tools, the Pydantic schemas are automatically sent to the LLM.

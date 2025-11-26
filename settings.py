@@ -26,11 +26,20 @@ INVENTORY_GROUP_FILE = BASE_DIR / "groups.yaml"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 """API key for GROQ LLM service."""
 
-# SWITCHED TO 8B INSTANT TO AVOID RATE LIMITS & IMPROVE SPEED
-# We prefer the env var, but if you are hitting limits, please unset LLM_MODEL_NAME in .env
-# or change it to "llama-3.1-8b-instant"
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "llama-3.1-8b-instant")
-"""Name of the LLM model to use for processing requests."""
+# Primary and fallback LLM models
+# The fallback mechanism will try models in order when the primary model fails
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-20b")
+"""Primary LLM model to use for processing requests."""
+
+# Fallback models in order of preference
+# Remove the primary model from fallbacks to avoid redundant attempts
+fallback_models_raw = [
+    model.strip()
+    for model in os.getenv("LLM_FALLBACK_MODELS", "openai/gpt-oss-120b,qwen/qwen3-32b").split(",")
+    if model.strip()
+]
+LLM_FALLBACK_MODELS = [model for model in fallback_models_raw if model != LLM_MODEL_NAME]
+"""List of fallback LLM models to use when primary model fails. Models are tried in order."""
 
 LLM_TEMPERATURE = 0.0
 """Temperature setting for the LLM model. 0.0 is best for tool use."""
