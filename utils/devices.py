@@ -2,6 +2,7 @@
 
 import logging
 import os
+from functools import lru_cache
 from typing import Any, Union
 
 from nornir import InitNornir
@@ -11,15 +12,15 @@ from settings import INVENTORY_GROUP_FILE, INVENTORY_HOST_FILE
 
 logger = logging.getLogger(__name__)
 
-# Lazy initialization - only create Nornir instance when needed
 _nornir_instance = None
 
 
 def _get_nornir() -> InitNornir:
-    """Lazily initialize Nornir instance."""
+    """Lazily initialize Nornir instance (Singleton)."""
     global _nornir_instance
     if _nornir_instance is None:
-        _nornir_instance = InitNornir(
+        # Initialize Nornir
+        nr = InitNornir(
             inventory={
                 "plugin": "SimpleInventory",
                 "options": {
@@ -27,47 +28,29 @@ def _get_nornir() -> InitNornir:
                     "group_file": str(INVENTORY_GROUP_FILE),
                 },
             },
-            runner={
-                "plugin": "threaded",
-                "options": {
-                    "num_workers": 10,
-                },
-            },
-            logging={"enabled": False},  # Disable Nornir's internal logging
+            runner={"plugin": "threaded", "options": {"num_workers": 20}},
+            logging={"enabled": False},
         )
-        _inject_passwords(_nornir_instance)
+
+        # Inject passwords
+        for host in nr.inventory.hosts.values():
+            if env_var := host.data.get("password_env_var"):
+                host.password = os.environ.get(env_var)
+
+        _nornir_instance = nr
+
     return _nornir_instance
 
 
-def _inject_passwords(nr) -> None:
-    """Set passwords from environment variables."""
-    for name, host in nr.inventory.hosts.items():
-        env_var = host.data.get("password_env_var")
-        if env_var:
-            password = os.environ.get(env_var)
-            if password:
-                host.password = password
-            else:
-                logger.warning("Password env var %s not found for %s", env_var, name)
-
-
-def get_all_device_names() -> list[str]:
-    """Return list of device names for the LLM prompt."""
-    nr = _get_nornir()
-    return list(nr.inventory.hosts.keys())
-
-
+@lru_cache(maxsize=1)
 def get_device_info() -> str:
-    """Return a formatted string of devices and their platforms."""
+    """Return a formatted string of devices and platforms (Cached)."""
     nr = _get_nornir()
-    info_list = []
-
-    for name, host in nr.inventory.hosts.items():
-        # Get platform, default to "unknown" if missing
-        platform = host.platform or "unknown"
-        info_list.append(f"- {name} (Platform: {platform})")
-
-    return "\n".join(info_list)
+    # Sorting ensures the string is deterministic, helping LLM caching
+    sorted_hosts = sorted(nr.inventory.hosts.items())
+    return "\n".join(
+        f"- {name} (Platform: {host.platform or 'unknown'})" for name, host in sorted_hosts
+    )
 
 
 def execute_nornir_task(
@@ -75,42 +58,30 @@ def execute_nornir_task(
     task_function: callable,
     **kwargs,
 ) -> dict[str, Any]:
-    """Execute Nornir task on specified devices with simplified result processing."""
-    # Normalize input
-    targets = [target_devices] if isinstance(target_devices, str) else target_devices
+    """Execute Nornir task on specified devices."""
+    targets = {target_devices} if isinstance(target_devices, str) else set(target_devices)
     nr = _get_nornir()
-    all_hosts = list(nr.inventory.hosts.keys())
 
-    # Validate devices exist
-    invalid = [t for t in targets if t not in all_hosts]
-    if invalid:
-        return {"error": f"Devices not found: {invalid}. Available: {all_hosts}"}
+    available_hosts = set(nr.inventory.hosts.keys())
 
-    # Filter and execute
-    filtered_nr = nr.filter(F(name__any=targets))
-    if not filtered_nr.inventory.hosts:
-        return {
-            "error": f"No matching devices found. Requested: {targets}, Available: {all_hosts}",
-        }
+    # Fast validation
+    if invalid := targets - available_hosts:
+        return {"error": f"Devices not found: {list(invalid)}"}
 
+    # Filter and Run
+    filtered_nr = nr.filter(F(name__any=list(targets)))
     results = filtered_nr.run(task=task_function, **kwargs)
 
-    # Simplified result processing
+    # Transform Results
     output = {}
     for hostname, multi_result in results.items():
-        # Get the first result in the chain
-        task_result = multi_result[0] if multi_result else None
+        res = multi_result[0] if multi_result else None
 
-        if task_result and task_result.exception:
-            output[hostname] = {"success": False, "error": str(task_result.exception)}
-        else:
-            success = not multi_result.failed
-            output[hostname] = {
-                "success": success,
-                "output": task_result.result if task_result else None,
-                "error": str(task_result.exception)
-                if task_result and task_result.exception
-                else None,
-            }
+        # Handle cases where Nornir/Netmiko returns an exception object as the result
+        is_success = not multi_result.failed
+        result_data = res.result if res else None
+        error_msg = str(res.exception) if res and res.exception else None
+
+        output[hostname] = {"success": is_success, "output": result_data, "error": error_msg}
 
     return output
