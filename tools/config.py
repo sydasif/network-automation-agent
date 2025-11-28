@@ -1,21 +1,18 @@
 """Configuration network tools using Nornir."""
 
-import json
-
 from langchain_core.tools import tool
 from nornir_netmiko.tasks import netmiko_send_config
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from tools.base import DeviceInput
 from utils.devices import execute_nornir_task
+from utils.responses import error, success, passthrough
 from utils.validators import FlexibleList
 
 
-class ConfigInput(BaseModel):
+class ConfigInput(DeviceInput):
     """Input schema for configuration commands."""
 
-    devices: FlexibleList = Field(
-        description="List of device hostnames (e.g., ['sw1', 'sw2']).",
-    )
     configs: FlexibleList = Field(
         description="List of configuration commands.",
     )
@@ -25,7 +22,7 @@ class ConfigInput(BaseModel):
 def config_command(devices: list[str], configs: list[str]) -> str:
     """Apply configuration changes to one or more network devices."""
     if not configs:
-        return json.dumps({"error": "No configuration commands provided."})
+        return error("No configuration commands provided.")
 
     # Flatten and sanitize
     clean_configs = [c.strip() for cmd in configs for c in cmd.split("\n") if c.strip()]
@@ -37,6 +34,6 @@ def config_command(devices: list[str], configs: list[str]) -> str:
     )
 
     if "error" in results and len(results) == 1:
-        return json.dumps(results)
+        return passthrough(results)
 
-    return json.dumps({"devices": results}, indent=2)
+    return success(results)
