@@ -1,14 +1,11 @@
 """Nornir driver and utility functions - KISS implementation."""
 
 import logging
-import os
 from functools import lru_cache
 from typing import Any, Union
 
 from nornir import InitNornir
 from nornir.core.filter import F
-
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +18,6 @@ def _get_nornir() -> InitNornir:
     if _nornir_instance is None:
         # Initialize Nornir using the config file
         nr = InitNornir(config_file="config.yaml")
-
-        # Inject passwords
-        for host in nr.inventory.hosts.values():
-            if env_var := host.data.get("password_env_var"):
-                host.password = os.environ.get(env_var)
 
         _nornir_instance = nr
 
