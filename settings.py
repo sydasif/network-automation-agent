@@ -1,7 +1,7 @@
 """Configuration settings for the Network AI Agent.
 
 This module contains all the configuration variables used throughout the application,
-including paths, LLM settings, and network device parameters.
+including LLM settings and other application parameters.
 """
 
 import os
@@ -15,12 +15,6 @@ load_dotenv()
 # Base Paths
 BASE_DIR = Path(__file__).resolve().parent
 """The base directory of the project."""
-
-INVENTORY_HOST_FILE = BASE_DIR / "hosts.yaml"
-"""Path to the hosts.yaml inventory file."""
-
-INVENTORY_GROUP_FILE = BASE_DIR / "groups.yaml"
-"""Path to the groups.yaml inventory file."""
 
 # LLM Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -47,7 +41,3 @@ LLM_TEMPERATURE = 0.0
 # Reduce history to save tokens
 MAX_HISTORY_MESSAGES = 10
 """Maximum number of messages to keep in history for context."""
-
-# Network Device Settings
-DEVICE_TIMEOUT = 30
-"""Timeout value in seconds for device connections."""

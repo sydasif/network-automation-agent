@@ -8,7 +8,7 @@ from typing import Any, Union
 from nornir import InitNornir
 from nornir.core.filter import F
 
-from settings import INVENTORY_GROUP_FILE, INVENTORY_HOST_FILE
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +19,8 @@ def _get_nornir() -> InitNornir:
     """Lazily initialize Nornir instance (Singleton)."""
     global _nornir_instance
     if _nornir_instance is None:
-        # Initialize Nornir
-        nr = InitNornir(
-            inventory={
-                "plugin": "SimpleInventory",
-                "options": {
-                    "host_file": str(INVENTORY_HOST_FILE),
-                    "group_file": str(INVENTORY_GROUP_FILE),
-                },
-            },
-            runner={"plugin": "threaded", "options": {"num_workers": 20}},
-            logging={"enabled": False},
-        )
+        # Initialize Nornir using the config file
+        nr = InitNornir(config_file="config.yaml")
 
         # Inject passwords
         for host in nr.inventory.hosts.values():
