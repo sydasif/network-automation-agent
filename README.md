@@ -36,8 +36,6 @@ Create your secrets and inventory files.
 
 ```ini
 GROQ_API_KEY=gsk_your_api_key_here
-LLM_MODEL_NAME=openai/gpt-oss-20b
-DEVICE_PASSWORD=your_secure_password
 ```
 
 **`hosts.yaml`** (Inventory):
@@ -47,13 +45,9 @@ DEVICE_PASSWORD=your_secure_password
 sw1:
   hostname: 192.168.1.10
   groups: [cisco]
-  data:
-    password_env_var: DEVICE_PASSWORD
 sw2:
   hostname: 192.168.1.11
   groups: [cisco]
-  data:
-    password_env_var: DEVICE_PASSWORD
 ```
 
 **`groups.yaml`** (Platform Definitions):
@@ -63,10 +57,12 @@ sw2:
 cisco:
   platform: cisco_ios
   username: admin
-  connection_options:
-    netmiko:
-      extras:
-        secret: "" # Optional enable password
+  password: admin
+
+arista:
+  platform: arista_eos
+  username: admin
+  password: admin
 ```
 
 ### 3. Run
