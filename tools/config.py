@@ -5,9 +5,9 @@ import json
 from langchain_core.tools import tool
 from nornir_netmiko.tasks import netmiko_send_config
 from pydantic import BaseModel, Field
-from utils.validators import FlexibleList
 
 from utils.devices import execute_nornir_task
+from utils.validators import FlexibleList
 
 
 class ConfigInput(BaseModel):

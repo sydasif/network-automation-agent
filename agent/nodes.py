@@ -6,14 +6,20 @@ from typing import Annotated, Any, TypedDict
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage, trim_messages
 from langchain_core.messages.utils import (
     count_tokens_approximately,
-)  # ✅ Built-in fast token counter
+)
 from langchain_core.runnables import RunnableWithFallbacks
 from langchain_groq import ChatGroq
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
-from settings import GROQ_API_KEY, LLM_FALLBACK_MODELS, LLM_MODEL_NAME, LLM_TEMPERATURE, MAX_HISTORY_TOKENS
+from settings import (
+    GROQ_API_KEY,
+    LLM_FALLBACK_MODELS,
+    LLM_MODEL_NAME,
+    LLM_TEMPERATURE,
+    MAX_HISTORY_TOKENS,
+)
 from tools.config import config_command
 from tools.show import show_command
 from utils.devices import get_device_info
