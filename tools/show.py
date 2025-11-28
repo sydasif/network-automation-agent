@@ -7,6 +7,7 @@ from pydantic import Field
 from tools.base import DeviceInput
 from utils.devices import execute_nornir_task
 from utils.responses import error, success, passthrough
+from utils.validators import is_safe_show_command  # 🆕 ADD THIS
 
 
 class ShowInput(DeviceInput):
@@ -18,9 +19,15 @@ class ShowInput(DeviceInput):
 @tool(args_schema=ShowInput)
 def show_command(devices: list[str], command: str) -> str:
     """Execute a read-only 'show' command on one or more devices."""
+
     # 1. Validation
     if not command.strip():
         return error("Command cannot be empty.")
+
+    # 🆕 ADD SAFETY CHECK
+    is_valid, error_msg = is_safe_show_command(command)
+    if not is_valid:
+        return error(f"Unsafe command rejected: {error_msg}")
 
     # 2. Execution (KISS: No manual looping, let Nornir handle it)
     results = execute_nornir_task(

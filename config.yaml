@@ -10,3 +10,10 @@ runner:
     num_workers: 20
 logging:
   enabled: false
+defaults:
+  connection_options:
+    netmiko:
+      extras:
+        timeout: 30
+        conn_timeout: 10
+        session_timeout: 60

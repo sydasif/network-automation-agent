@@ -38,9 +38,5 @@ LLM_FALLBACK_MODELS = [model for model in fallback_models_raw if model != LLM_MO
 LLM_TEMPERATURE = 0.0
 """Temperature setting for the LLM model. 0.0 is best for tool use."""
 
-# Token management settings
-MAX_CONTEXT_TOKENS = 4000
-"""Maximum context tokens for the LLM (conservative limit for most models)."""
-
 MAX_HISTORY_TOKENS = 3500
 """Maximum tokens for conversation history (reserving ~500 tokens for system prompt and response buffer)."""
