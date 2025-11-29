@@ -7,7 +7,6 @@ from langchain_core.messages import AIMessage, SystemMessage, ToolMessage, trim_
 from langchain_core.messages.utils import (
     count_tokens_approximately,
 )
-from langchain_core.runnables import RunnableWithFallbacks
 from langchain_groq import ChatGroq
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
@@ -15,7 +14,6 @@ from langgraph.types import interrupt
 
 from settings import (
     GROQ_API_KEY,
-    LLM_FALLBACK_MODELS,
     LLM_MODEL_NAME,
     LLM_TEMPERATURE,
     MAX_HISTORY_TOKENS,
@@ -73,22 +71,21 @@ When users request operations across multiple devices:
 - "Configure VLAN 10 on SW1, SW2, SW3" → One tool call with all three switches
 """
 
+
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
-def _create_llm() -> RunnableWithFallbacks:
+def _create_llm() -> ChatGroq:
+    """Create and return a single LLM instance.
+
+    Raises:
+        RuntimeError: If GROQ_API_KEY is not set.
+    """
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY not set")
 
-    primary = ChatGroq(
-        temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY
-    )
-    fallbacks = [
-        ChatGroq(temperature=LLM_TEMPERATURE, model_name=m, api_key=GROQ_API_KEY)
-        for m in LLM_FALLBACK_MODELS
-    ]
-    return primary.with_fallbacks(fallbacks=fallbacks)
+    return ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY)
 
 
 llm = _create_llm()

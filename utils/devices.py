@@ -52,7 +52,7 @@ def execute_nornir_task(
     filtered_nr = nr.filter(F(name__any=list(targets)))
     results = filtered_nr.run(task=task_function, **kwargs)
 
-    # Transform Results with error categorization
+    # Transform Results
     output = {}
     for hostname, multi_result in results.items():
         res = multi_result[0] if multi_result else None
@@ -65,34 +65,13 @@ def execute_nornir_task(
                 "error": None,
             }
         else:
-            # 🆕 ADD ERROR CATEGORIZATION
+            # Error case
             error_str = str(res.exception) if res and res.exception else "Unknown error"
-            error_type = _categorize_network_error(error_str)
 
             output[hostname] = {
                 "success": False,
                 "output": None,
                 "error": error_str,
-                "error_type": error_type,  # 🆕 NEW FIELD
             }
 
     return output
-
-
-# 🆕 ADD THIS FUNCTION
-def _categorize_network_error(error_str: str) -> str:
-    """Categorize network errors for better LLM understanding."""
-    error_lower = error_str.lower()
-
-    if "authentication" in error_lower or "permission denied" in error_lower:
-        return "AUTH_FAILED"
-    elif "timed out" in error_lower or "timeout" in error_lower:
-        return "TIMEOUT"
-    elif "connection refused" in error_lower or "no route" in error_lower:
-        return "UNREACHABLE"
-    elif "invalid" in error_lower or "syntax error" in error_lower:
-        return "INVALID_COMMAND"
-    elif "configuration mode" in error_lower:
-        return "CONFIG_MODE_ERROR"
-    else:
-        return "UNKNOWN"

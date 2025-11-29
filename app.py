@@ -14,6 +14,10 @@ from langgraph.types import Command
 
 from agent.nodes import NODE_UNDERSTAND, RESUME_APPROVED, RESUME_DENIED
 from agent.workflow import create_graph, get_approval_request
+from utils.logger import setup_logging
+
+# Initialize structured logging
+setup_logging()
 
 # Initialize graph once to avoid overhead - this creates the workflow when the module loads
 graph = create_graph()

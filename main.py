@@ -11,6 +11,8 @@ import uuid
 
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
+from rich import print
+from rich.markdown import Markdown
 
 from agent.nodes import RESUME_APPROVED, RESUME_DENIED
 from agent.workflow import create_graph, get_approval_request
@@ -45,7 +47,7 @@ def run_single_command(app, command: str, device: str = None) -> None:
     # We don't need to manually check for "show" commands; the graph won't pause for them.
     # This loop handles multiple approval requests if they occur in sequence
     while tool_call := get_approval_request(snapshot):
-        print("\n⚠️  CONFIGURATION CHANGE DETECTED ⚠️")
+        print("\n[bold yellow]⚠️  CONFIGURATION CHANGE DETECTED ⚠️[/bold yellow]")
         print(f"Action:  {tool_call['name']}")
         print(f"Args:    {tool_call['args']}")
 
@@ -63,7 +65,8 @@ def run_single_command(app, command: str, device: str = None) -> None:
 
     # Print the final result of the command execution
     if "messages" in result and result["messages"]:
-        print(result["messages"][-1].content)
+        print("\n" + "-" * 50 + "\n")
+        print(Markdown(result["messages"][-1].content))
 
 
 def main() -> None:
@@ -86,8 +89,10 @@ def main() -> None:
     command = " ".join(args.command)
 
     # Set up logging with appropriate level
-    log_level = logging.DEBUG if args.debug else logging.ERROR
-    logging.basicConfig(level=log_level)
+    from utils.logger import setup_logging
+
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    setup_logging(level=log_level)
 
     try:
         app = create_graph()

@@ -2,17 +2,16 @@
 
 from langchain_core.tools import tool
 from nornir_netmiko.tasks import netmiko_send_command
-from pydantic import Field
+from pydantic import BaseModel, Field
 
-from tools.base import DeviceInput
 from utils.devices import execute_nornir_task
-from utils.responses import error, success, passthrough
-from utils.validators import is_safe_show_command  # 🆕 ADD THIS
+from utils.responses import error, passthrough, success
 
 
-class ShowInput(DeviceInput):
+class ShowInput(BaseModel):
     """Input schema for show commands."""
 
+    devices: list[str] = Field(description="List of device hostnames (e.g., ['sw1', 'sw2']).")
     command: str = Field(description="The show command to execute (e.g., 'show ip int brief').")
 
 
@@ -21,13 +20,10 @@ def show_command(devices: list[str], command: str) -> str:
     """Execute a read-only 'show' command on one or more devices."""
 
     # 1. Validation
+    if not devices:
+        return error("No devices specified.")
     if not command.strip():
         return error("Command cannot be empty.")
-
-    # 🆕 ADD SAFETY CHECK
-    is_valid, error_msg = is_safe_show_command(command)
-    if not is_valid:
-        return error(f"Unsafe command rejected: {error_msg}")
 
     # 2. Execution (KISS: No manual looping, let Nornir handle it)
     results = execute_nornir_task(
