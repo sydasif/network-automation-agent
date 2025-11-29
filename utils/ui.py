@@ -4,14 +4,9 @@ This module provides improved user interface elements with clear separation
 between logging, input, and output using color coding and visual boundaries.
 """
 
-from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
-from rich.box import ROUNDED
 from rich.text import Text
-from rich.prompt import Prompt
-from rich.layout import Layout
-from rich.live import Live
 import logging
 
 
@@ -32,7 +27,7 @@ class NetworkAgentUI:
                 header_text,
                 title="[bold green]Welcome[/bold green]",
                 border_style="green",
-                expand=False
+                expand=False,
             )
         )
         self.console.print()  # Empty line for spacing
@@ -40,14 +35,16 @@ class NetworkAgentUI:
     def print_footer(self):
         """Print footer with help information."""
         footer_text = Text("Type 'exit' or 'quit' to end the session", style="dim")
-        footer_text.append("\nFor network commands, simply describe what you want to do", style="dim")
+        footer_text.append(
+            "\nFor network commands, simply describe what you want to do", style="dim"
+        )
 
         self.console.print(
             Panel(
                 footer_text,
                 title="[bold yellow]Usage[/bold yellow]",
                 border_style="yellow",
-                expand=False
+                expand=False,
             )
         )
 
@@ -101,13 +98,15 @@ class NetworkAgentUI:
                 f"[bold]Action:[/bold] {action}\n[bold]Args:[/bold] {args}",
                 title="[bold red]⚠️  CONFIGURATION CHANGE DETECTED ⚠️[/bold red]",
                 border_style="red",
-                expand=False
+                expand=False,
             )
         )
 
     def get_approval_decision(self) -> str:
         """Get user decision for approval with styling."""
-        self.console.print("[bold white]Proceed with configuration change? (yes/no): [/bold white]", end="")
+        self.console.print(
+            "[bold white]Proceed with configuration change? (yes/no): [/bold white]", end=""
+        )
         return input().strip().lower()
 
 
@@ -136,12 +135,16 @@ class ColoredLogHandler(logging.Handler):
                 level_prefix = "DEBUG"
 
             # Skip very verbose logs from third-party libraries that clutter the UI
-            if any(skip_name in record.name for skip_name in
-                   ['httpcore', 'httpx', 'markdown_it', 'groq._base_client']):
+            if any(
+                skip_name in record.name
+                for skip_name in ["httpcore", "httpx", "markdown_it", "groq._base_client"]
+            ):
                 return  # Skip these logs to keep UI clean
 
             # Display log message with color-coded level and visual separation
-            self.console.print(f"[{style}]│ {level_prefix}: {record.getMessage()} │[/]", style=style)
+            self.console.print(
+                f"[{style}]│ {level_prefix}: {record.getMessage()} │[/]", style=style
+            )
 
         except Exception:
             self.handleError(record)
@@ -150,7 +153,7 @@ class ColoredLogHandler(logging.Handler):
 def setup_colored_logging(console: Console):
     """Setup colored logging that doesn't interfere with UI elements."""
     handler = ColoredLogHandler(console)
-    handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+    handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
 
     # Add handler to root logger
     root_logger = logging.getLogger()

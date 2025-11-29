@@ -18,7 +18,9 @@ from agent.workflow import create_graph, get_approval_request
 from utils.ui import NetworkAgentUI, setup_colored_logging
 
 
-def run_single_command(app, command: str, config: dict, print_output: bool = True, ui: NetworkAgentUI = None) -> dict:
+def run_single_command(
+    app, command: str, config: dict, print_output: bool = True, ui: NetworkAgentUI = None
+) -> dict:
     """Execute a single network command through the agent workflow.
 
     This function processes a command by sending it to the agent workflow,
@@ -47,7 +49,7 @@ def run_single_command(app, command: str, config: dict, print_output: bool = Tru
     # This loop handles multiple approval requests if they occur in sequence
     while tool_call := get_approval_request(snapshot):
         if ui:
-            ui.print_approval_request(tool_call['name'], tool_call['args'])
+            ui.print_approval_request(tool_call["name"], tool_call["args"])
             choice = ui.get_approval_decision()
         else:
             print("\n[bold yellow]⚠️  CONFIGURATION CHANGE DETECTED ⚠️[/bold yellow]")
@@ -71,6 +73,7 @@ def run_single_command(app, command: str, config: dict, print_output: bool = Tru
             ui.print_output(result["messages"][-1].content)
         else:
             from rich.markdown import Markdown
+
             print("\n")
             print(Markdown(result["messages"][-1].content))
             print("\n")
@@ -164,7 +167,7 @@ def main() -> None:
 
     # Set up colored logging that doesn't interfere with UI
     console = Console()
-    log_handler = setup_colored_logging(console)
+    setup_colored_logging(console)
 
     # Prevent other loggers from adding their own handlers that would interfere with UI
     logging.getLogger().setLevel(log_level)
