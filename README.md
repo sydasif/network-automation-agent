@@ -71,7 +71,48 @@ arista:
 docker compose up --build
 ```
 
-Access the Web UI at **<http://localhost:8000>**
+---
+
+## 🐳 Docker Usage
+
+The agent now runs in CLI mode only with both single command and interactive chat capabilities. Here are the ways to use it:
+
+### Option 1: Run a single command
+```bash
+docker compose run --rm network-agent-cli python main.py "show ip interface brief"
+```
+
+### Option 2: Interactive chat mode (recommended)
+```bash
+# Start an interactive chat session
+docker compose run --rm -it network-agent-cli python main.py --chat
+
+# Or with a specific device
+docker compose run --rm -it network-agent-cli python main.py --chat --device sw1
+```
+
+### Option 3: Start the container and run commands interactively
+```bash
+# Start the container in detached mode
+docker compose up -d
+
+# Execute a single command in the running container
+docker compose exec network-agent-cli python main.py "show version on device1"
+
+# Start an interactive chat session in the running container
+docker compose exec -it network-agent-cli python main.py --chat
+
+# For interactive shell access
+docker compose exec -it network-agent-cli bash
+# Then run: python main.py --chat  (for chat mode)
+# Or run: python main.py "your command here"  (for single command)
+```
+
+### Option 4: Interactive shell session
+```bash
+docker compose run --rm -it network-agent-cli bash
+# Then run your commands inside the container
+```
 
 ---
 
@@ -84,7 +125,6 @@ The project follows a flattened, **KISS** architecture leveraging **Nornir** for
 | **Brain** | `agent/` | LangGraph workflow, prompts, and decision routing. |
 | **Hands** | `tools/` | Split into `show.py` (Read) and `config.py` (Write). |
 | **Engine** | `utils/devices.py` | **Nornir** initialization and task execution engine. |
-| **UI** | `app.py` | Chainlit Web Interface. |
 | **CLI** | `main.py` | Terminal entry point. |
 
 ### Key Features
@@ -114,13 +154,7 @@ If you prefer running without Docker:
     pip install -r requirements.txt
     ```
 
-2. **Run Web UI**:
-
-    ```bash
-    chainlit run app.py -w
-    ```
-
-3. **Run CLI**:
+2. **Run CLI**:
 
     ```bash
     python main.py "Show ip int brief on sw1"

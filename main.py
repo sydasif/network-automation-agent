@@ -2,6 +2,7 @@
 
 This module provides a command-line interface for the Network AI Agent,
 allowing users to execute network commands and configurations via natural language.
+Supports both single command execution and interactive chat mode.
 """
 
 import argparse
@@ -18,25 +19,23 @@ from agent.nodes import RESUME_APPROVED, RESUME_DENIED
 from agent.workflow import create_graph, get_approval_request
 
 
-def run_single_command(app, command: str, device: str = None) -> None:
+def run_single_command(app, command: str, config: dict, print_output: bool = True) -> dict:
     """Execute a single network command through the agent workflow.
 
     This function processes a command by sending it to the agent workflow,
-    handling any required approvals, and displaying the results.
+    handling any required approvals, and returning the results.
 
     Args:
         app: The compiled LangGraph workflow instance.
         command: The natural language command to execute.
-        device: Optional target device name. If not provided, the LLM will determine targets.
-    """
-    # Generate a unique session ID for this execution
-    session_id = str(uuid.uuid4())
-    config = {"configurable": {"thread_id": f"session-{session_id}"}}
+        config: The configuration dict containing thread_id and other settings.
+        print_output: Whether to print the result (True for single command mode, False for interactive mode)
 
+    Returns:
+        The result of the command execution.
+    """
     # KISS: Keep the prompt simple. Let the LLM interpret the intent.
     user_input = f"Run command '{command}'"
-    if device:
-        user_input += f" on device {device}"
 
     # Invoke the workflow with the user's command
     result = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
@@ -63,30 +62,94 @@ def run_single_command(app, command: str, device: str = None) -> None:
         # Update the snapshot for the next iteration
         snapshot = app.get_state(config)
 
-    # Print the final result of the command execution
-    if "messages" in result and result["messages"]:
-        print("\n" + "-" * 50 + "\n")
+    # Print the final result of the command execution (for single command mode)
+    if print_output and "messages" in result and result["messages"]:
+        print("\n" + "-" * 50)
         print(Markdown(result["messages"][-1].content))
+        print("-" * 50 + "\n")
+
+    return result
+
+
+def run_interactive_chat(app, initial_device: str = None) -> None:
+    """Run the agent in interactive chat mode, allowing multiple commands in one session.
+
+    Args:
+        app: The compiled LangGraph workflow instance.
+        initial_device: Optional target device for all commands in this session.
+    """
+    # Generate a unique session ID for this chat session
+    session_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": f"session-{session_id}"}}
+
+    print("[bold blue]🚀 Network AI Agent Chat Mode[/bold blue]")
+    print("Enter your network commands or chat (type 'exit' or 'quit' to end the session)\n")
+
+    while True:
+        try:
+            # Get command from user
+            command = input("Ask: ").strip()
+
+            # Check for exit commands
+            if command.lower() in ["exit", "quit", "q"]:
+                print("[bold blue]👋 Goodbye![/bold blue]")
+                break
+
+            if not command:
+                continue
+
+            # Add device context if specified
+            if initial_device:
+                full_command = f"{command} on device {initial_device}"
+            else:
+                full_command = command
+
+            # Process the command (do not print output in interactive mode as we handle it below)
+            result = run_single_command(app, full_command, config, print_output=False)
+
+            # Print the result of the command execution
+            if "messages" in result and result["messages"]:
+                print("\n" + "-" * 50)
+                print(Markdown(result["messages"][-1].content))
+                print("-" * 50 + "\n")
+            else:
+                # Handle case where no output is returned (might happen with general chat)
+                print("\n" + "-" * 50)
+                print("Response processed successfully.")
+                print("-" * 50 + "\n")
+
+        except KeyboardInterrupt:
+            print("\n[bold blue]\n👋 Session interrupted. Goodbye![/bold blue]")
+            break
+        except EOFError:
+            print("\n[bold blue]\n👋 Session ended. Goodbye![/bold blue]")
+            break
+        except Exception as e:
+            print(f"[bold red]Error processing command: {e}[/bold red]")
 
 
 def main() -> None:
     """Main entry point for the Network AI Agent CLI.
 
     Parses command line arguments, sets up logging, creates the agent workflow,
-    and executes the requested command.
+    and executes either a single command or enters interactive chat mode.
     """
     parser = argparse.ArgumentParser(description="Network Agent Command Tool")
-    parser.add_argument("command", nargs="*", help="The command to execute on the device")
+    parser.add_argument(
+        "command",
+        nargs="*",
+        help="The command to execute on the device (omit for interactive chat mode)",
+    )
     parser.add_argument("--device", "-d", help="Target device for the command (recommended)")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--chat",
+        "-c",
+        action="store_true",
+        help="Start interactive chat mode (default when no command provided)",
+    )
 
     args = parser.parse_args()
-
-    if not args.command:
-        parser.print_help()
-        sys.exit(1)
-
-    command = " ".join(args.command)
 
     # Set up logging with appropriate level
     from utils.logger import setup_logging
@@ -96,7 +159,17 @@ def main() -> None:
 
     try:
         app = create_graph()
-        run_single_command(app, command, args.device)
+
+        # Determine mode based on arguments
+        if args.chat or not args.command:
+            run_interactive_chat(app, args.device)
+        else:
+            # Generate config for single command mode
+            session_id = str(uuid.uuid4())
+            config = {"configurable": {"thread_id": f"session-{session_id}"}}
+
+            command = " ".join(args.command)
+            run_single_command(app, command, config)
     except Exception as e:
         logging.error(f"Failed to execute command: {e}")
         sys.exit(1)

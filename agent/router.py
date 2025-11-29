@@ -6,7 +6,7 @@ LangGraph workflow based on the state and tool calls.
 
 from typing import Literal
 
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, AIMessage
 from langgraph.graph import END
 
 from agent.nodes import NODE_APPROVAL, NODE_EXECUTE, NODE_UNDERSTAND, State

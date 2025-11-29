@@ -3,7 +3,7 @@ FROM python:3.12-slim
 
 # Set environment variables
 # PYTHONDONTWRITEBYTECODE: Prevents Python from writing pyc files to disc
-# PYTHONUNBUFFERED: Ensures logs are streamed to console immediately (Vital for Chainlit)
+# PYTHONUNBUFFERED: Ensures logs are streamed to console immediately
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
@@ -26,10 +26,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
-# Expose the default Chainlit port
-EXPOSE 8000
-
-# Command to run the application
-# -w: Watch mode (reloads on code changes)
-# --host 0.0.0.0: Required to access the app from outside the container
-CMD ["chainlit", "run", "app.py", "-w", "--port", "8000", "--host", "0.0.0.0"]
+# Default command to run the application in interactive chat mode
+# Use: docker run -it <image> or docker compose run -it network-agent-cli
+CMD ["python", "main.py", "--chat"]
