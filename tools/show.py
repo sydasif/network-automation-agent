@@ -30,7 +30,6 @@ def show_command(devices: list[str], command: str) -> str:
         target_devices=devices,
         task_function=netmiko_send_command,
         command_string=command,
-        use_textfsm=True,  # Automatically parses output if template exists
     )
 
     # 3. Error Handling for global failures (e.g., device not found)
