@@ -1,5 +1,5 @@
 services:
-  network-agent:
+  network-agent-cli:
     build: .
     container_name: network-agent-cli
     volumes:

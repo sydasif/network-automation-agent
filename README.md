@@ -15,7 +15,7 @@
 
 </div>
 
-A lightweight, "Human-in-the-Loop" AI agent that translates natural language into network configuration and show commands. Built with **LangGraph**, **Nornir**, and **Chainlit**.
+A lightweight, "Human-in-the-Loop" AI agent that translates natural language into network configuration and show commands. Built with **LangGraph**, **Nornir**, and **Rich**.
 
 ## 🚀 Quick Start (Docker)
 
@@ -78,11 +78,13 @@ docker compose up --build
 The agent now runs in CLI mode only with both single command and interactive chat capabilities. Here are the ways to use it:
 
 ### Option 1: Run a single command
+
 ```bash
 docker compose run --rm network-agent-cli python main.py "show ip interface brief"
 ```
 
 ### Option 2: Interactive chat mode (recommended)
+
 ```bash
 # Start an interactive chat session
 docker compose run --rm -it network-agent-cli python main.py --chat
@@ -92,6 +94,7 @@ docker compose run --rm -it network-agent-cli python main.py --chat --device sw1
 ```
 
 ### Option 3: Start the container and run commands interactively
+
 ```bash
 # Start the container in detached mode
 docker compose up -d
@@ -109,6 +112,7 @@ docker compose exec -it network-agent-cli bash
 ```
 
 ### Option 4: Interactive shell session
+
 ```bash
 docker compose run --rm -it network-agent-cli bash
 # Then run your commands inside the container
