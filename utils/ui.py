@@ -156,10 +156,9 @@ class ColoredLogHandler(logging.Handler):
                 level_prefix = "DEBUG"
 
             # Skip very verbose logs from third-party libraries that clutter the UI
-            if any(
-                skip_name in record.name
-                for skip_name in ["httpcore", "httpx", "markdown_it", "groq._base_client"]
-            ):
+            from settings import LOG_SKIP_MODULES
+
+            if any(skip_name in record.name for skip_name in LOG_SKIP_MODULES):
                 return  # Skip these logs to keep UI clean
 
             # Display log message with color-coded level and visual separation
@@ -173,8 +172,13 @@ class ColoredLogHandler(logging.Handler):
             self.handleError(record)
 
 
-def setup_colored_logging(console: Console):
-    """Setup colored logging that doesn't interfere with UI elements."""
+def setup_colored_logging():
+    """Setup colored logging that doesn't interfere with UI elements.
+
+    Creates its own Console instance for logging to avoid requiring
+    external console management.
+    """
+    console = Console()
     handler = ColoredLogHandler(console)
     handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
 

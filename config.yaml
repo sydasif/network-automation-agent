@@ -1,4 +1,13 @@
 ---
+# Nornir Configuration for Network Automation Agent
+#
+# Note: Some settings can be overridden via environment variables.
+# See settings.py for available environment variables:
+# - NUM_WORKERS: Number of parallel workers (default: 20)
+# - NETMIKO_TIMEOUT: Command timeout in seconds (default: 30)
+# - NETMIKO_CONN_TIMEOUT: Connection timeout in seconds (default: 10)
+# - NETMIKO_SESSION_TIMEOUT: Session timeout in seconds (default: 60)
+
 inventory:
   plugin: SimpleInventory
   options:
@@ -7,6 +16,7 @@ inventory:
 runner:
   plugin: threaded
   options:
+    # Number of parallel workers (can be overridden with NUM_WORKERS env var)
     num_workers: 20
 logging:
   enabled: false
@@ -14,6 +24,7 @@ defaults:
   connection_options:
     netmiko:
       extras:
+        # Timeouts can be overridden via environment variables (see settings.py)
         timeout: 30
         conn_timeout: 10
         session_timeout: 60

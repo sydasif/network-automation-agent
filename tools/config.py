@@ -33,7 +33,7 @@ def config_command(devices: list[str], configs: list[str]) -> str:
     if not clean_configs:
         return error("No configuration commands provided.")
 
-    # 3. Apply Configuration
+    # 2. Apply Configuration
     results = execute_nornir_task(
         target_devices=devices,
         task_function=netmiko_send_config,

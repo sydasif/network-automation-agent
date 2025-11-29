@@ -12,7 +12,6 @@ dependencies = [
     "pydantic>=2.9.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.2",
-    "chainlit>=2.9.2",
     "nornir>=3.5.0",
     "nornir-netmiko>=1.0.1",
     "nornir-utils>=0.2.0",

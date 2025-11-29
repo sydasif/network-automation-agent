@@ -28,3 +28,25 @@ LLM_TEMPERATURE = 0.0
 
 MAX_HISTORY_TOKENS = 3500
 """Maximum tokens for conversation history (reserving ~500 tokens for system prompt and response buffer)."""
+
+# Logging Configuration
+LOG_SKIP_MODULES = [
+    "httpcore",
+    "httpx",
+    "markdown_it",
+    "groq._base_client",
+]
+"""List of module names whose logs should be skipped to keep UI clean."""
+
+# Nornir Configuration
+NUM_WORKERS = int(os.getenv("NUM_WORKERS", "20"))
+"""Number of parallel workers for Nornir task execution."""
+
+NETMIKO_TIMEOUT = int(os.getenv("NETMIKO_TIMEOUT", "30"))
+"""Default timeout for Netmiko commands in seconds."""
+
+NETMIKO_CONN_TIMEOUT = int(os.getenv("NETMIKO_CONN_TIMEOUT", "10"))
+"""Connection timeout for Netmiko in seconds."""
+
+NETMIKO_SESSION_TIMEOUT = int(os.getenv("NETMIKO_SESSION_TIMEOUT", "60"))
+"""Session timeout for Netmiko in seconds."""

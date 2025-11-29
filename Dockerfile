@@ -16,12 +16,15 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (Docker Layer Caching optimization)
-# If you change code but not requirements, Docker skips this step on rebuilds
-COPY requirements.txt .
+# Install uv for dependency management
+RUN pip install --no-cache-dir uv
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy dependency files first (Docker Layer Caching optimization)
+# If you change code but not dependencies, Docker skips this step on rebuilds
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies using uv
+RUN uv sync --frozen
 
 # Copy the rest of the application code
 COPY . .

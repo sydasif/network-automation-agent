@@ -12,9 +12,11 @@ import uuid
 
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
+from rich.markdown import Markdown
 
 from agent.nodes import RESUME_APPROVED, RESUME_DENIED
 from agent.workflow import create_graph, get_approval_request
+from utils.logger import setup_logging
 from utils.ui import NetworkAgentUI, setup_colored_logging
 
 
@@ -68,12 +70,10 @@ def run_single_command(
         snapshot = app.get_state(config)
 
     # Print the final result of the command execution (for single command mode)
-    if print_output and "messages" in result and result["messages"]:
+    if print_output and "messages" in result and len(result["messages"]) > 0:
         if ui:
             ui.print_output(result["messages"][-1].content)
         else:
-            from rich.markdown import Markdown
-
             print("\n")
             print(Markdown(result["messages"][-1].content))
             print("\n")
@@ -134,6 +134,8 @@ def run_interactive_chat(app, initial_device: str = None) -> None:
         except Exception as e:
             ui.print_error(f"Error processing command: {e}")
 
+    return  # Explicit return for clarity
+
 
 def main() -> None:
     """Main entry point for the Network AI Agent CLI.
@@ -158,16 +160,11 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Set up logging with appropriate level
-    from utils.logger import setup_logging
-    from rich.console import Console
-
     log_level = logging.DEBUG if args.debug else logging.INFO
     setup_logging(level=log_level)
 
     # Set up colored logging that doesn't interfere with UI
-    console = Console()
-    setup_colored_logging(console)
+    setup_colored_logging()
 
     # Prevent other loggers from adding their own handlers that would interfere with UI
     logging.getLogger().setLevel(log_level)

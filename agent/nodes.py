@@ -1,6 +1,7 @@
 """Agent nodes definition for the Network AI Agent."""
 
 import logging
+from functools import lru_cache
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage, trim_messages
@@ -103,8 +104,23 @@ def _create_llm() -> ChatGroq:
     return ChatGroq(temperature=LLM_TEMPERATURE, model_name=LLM_MODEL_NAME, api_key=GROQ_API_KEY)
 
 
-llm = _create_llm()
-llm_with_tools = llm.bind_tools([show_command, config_command])
+# Lazy-loading LLM instances using lru_cache for singleton pattern
+# This prevents import-time crashes and improves testability
+
+
+@lru_cache(maxsize=1)
+def get_llm() -> ChatGroq:
+    """Get or create the LLM instance (lazy-loaded singleton)."""
+    return _create_llm()
+
+
+@lru_cache(maxsize=1)
+def get_llm_with_tools():
+    """Get or create the LLM instance with tools bound (lazy-loaded singleton)."""
+    return get_llm().bind_tools([show_command, config_command])
+
+
+# ToolNode is stateless and can be created at module level
 execute_node = ToolNode([show_command, config_command])
 
 
@@ -145,12 +161,28 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
                 f"→ {len(trimmed_msgs)} messages (~{trimmed_tokens} tokens)"
             )
 
-    except Exception as trim_error:
-        # Fallback: if trim_messages fails for any reason, keep last 20 messages
+    except (ValueError, IndexError, NotImplementedError) as trim_error:
+        # Catch specific exceptions that trim_messages can raise
         logger.warning(
-            f"Message trimming failed: {trim_error}. Using fallback (last 20 messages)."
+            f"Message trimming failed ({type(trim_error).__name__}): {trim_error}. "
+            "Using fallback strategy."
         )
-        trimmed_msgs = messages[-20:] if len(messages) > 20 else messages
+        # Fallback: Use a simple strategy to keep recent messages
+        # Start with last 10 messages and verify they fit within token limit
+        fallback_count = min(10, len(messages))
+        trimmed_msgs = messages[-fallback_count:] if messages else []
+
+        # Verify fallback doesn't exceed token limit
+        if trimmed_msgs:
+            fallback_tokens = count_tokens_approximately(trimmed_msgs)
+            while fallback_tokens > MAX_HISTORY_TOKENS and fallback_count > 1:
+                fallback_count -= 1
+                trimmed_msgs = messages[-fallback_count:]
+                fallback_tokens = count_tokens_approximately(trimmed_msgs)
+
+            logger.info(
+                f"Fallback: Using last {fallback_count} messages (~{fallback_tokens} tokens)"
+            )
 
     try:
         # Check if we are processing a tool output (last message is a ToolMessage)
@@ -161,7 +193,9 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
             structured_system_msg = SystemMessage(content=STRUCTURED_OUTPUT_PROMPT)
 
             try:
-                structured_llm = llm.with_structured_output(NetworkResponse, method="json_mode")
+                structured_llm = get_llm().with_structured_output(
+                    NetworkResponse, method="json_mode"
+                )
                 response = structured_llm.invoke([structured_system_msg] + trimmed_msgs)
 
                 # Convert Pydantic model to JSON string for the AIMessage
@@ -179,7 +213,7 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
                 }
 
         # Normal chat interaction
-        response = llm_with_tools.invoke([system_msg] + trimmed_msgs)
+        response = get_llm_with_tools().invoke([system_msg] + trimmed_msgs)
         return {"messages": [response]}
 
     except Exception as e:
