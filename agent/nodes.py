@@ -11,6 +11,7 @@ from langchain_groq import ChatGroq
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
+from pydantic import BaseModel, Field
 
 from settings import (
     GROQ_API_KEY,
@@ -38,7 +39,7 @@ You are a network automation assistant.
 Device inventory:
 {device_inventory}
 
-Role: Understand user requests and turns into network operations or normal responses (chat).
+Role: Understand user requests and translate them into network operations or provide normal chat responses.
 
 Tools:
 - `show_command`: read-only (show/get/display)
@@ -48,12 +49,42 @@ Rules:
 - Call tools only for explicit network operations; do not call for greetings or general chat.
 - Match syntax to each platform. If a command fails, include the device error. Confirm successful config changes.
 - Multi-device: detect target devices, produce device-specific commands per platform (IOS, EOS, JunOS, etc.).
-
-Output:
-- Summarize device raw outputs clearly for the user.
-- After summary, format in (headings, tables etc.) markdown.
-- Add a short note of actions taken or errors encountered.
 """
+
+
+STRUCTURED_OUTPUT_PROMPT = """
+You are a network automation assistant.
+
+Your task is to analyze the provided network command output and structure it.
+Do NOT call any more tools.
+Analyze the output from the executed tool and return a structured JSON response.
+
+You MUST return a JSON object with exactly these keys:
+- "summary": A human-readable executive summary. Highlight operational status, health, and anomalies. Use Markdown for readability.
+- "structured_data": The parsed data as a list or dictionary.
+- "errors": A list of error strings (or null if none).
+
+Example:
+{
+  "summary": "Interface Eth1 is up.",
+  "structured_data": {"interfaces": [{"name": "Eth1", "status": "up"}]},
+  "errors": []
+}
+"""
+
+
+class NetworkResponse(BaseModel):
+    """Structured response for network operations."""
+
+    summary: str = Field(
+        description="A human-readable summary highlighting operational status and anomalies."
+    )
+    structured_data: dict | list = Field(
+        description="The parsed data from the device output in JSON format (list or dict)."
+    )
+    errors: list[str] | None = Field(
+        description="List of any errors encountered during execution."
+    )
 
 
 class State(TypedDict):
@@ -78,10 +109,11 @@ execute_node = ToolNode([show_command, config_command])
 
 
 def understand_node(state: dict[str, Any]) -> dict[str, Any]:
-    """
-    Decide which tool to call.
+    """Process user messages and decide which tool to call or structure tool outputs.
 
-    ✅ FIXED: Now using proper LangChain trim_messages with count_tokens_approximately
+    This node handles two scenarios:
+    1. User input: Routes to appropriate tools (show_command or config_command).
+    2. Tool output: Structures the response using LLM for human-readable display.
     """
     messages = state.get("messages", [])
 
@@ -89,21 +121,20 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
     inventory_str = get_device_info()
     system_msg = SystemMessage(content=UNDERSTAND_PROMPT.format(device_inventory=inventory_str))
 
-    # 2. ✅ FIXED: Proper LangChain message trimming
-    # Using the built-in count_tokens_approximately for fast, accurate token counting
-    # This is LangChain's recommended approach for production use
+    # Message trimming for context window management
+    # Using the built-in count_tokens_approximately for fast token counting
     try:
         trimmed_msgs = trim_messages(
             messages,
-            max_tokens=MAX_HISTORY_TOKENS,  # ✅ Realistic token limit (was 10!)
-            strategy="last",  # Keep most recent messages
-            token_counter=count_tokens_approximately,  # ✅ Fast approximate counter
-            start_on="human",  # Ensure valid chat history
-            include_system=False,  # System message added separately
-            allow_partial=False,  # Keep complete messages only
+            max_tokens=MAX_HISTORY_TOKENS,
+            strategy="last",
+            token_counter=count_tokens_approximately,
+            start_on="human",
+            include_system=False,
+            allow_partial=False,
         )
 
-        # 3. Log context usage for monitoring (optional but recommended)
+        # Log context usage for monitoring
         if len(messages) > len(trimmed_msgs):
             # Only count tokens if we actually trimmed
             original_tokens = count_tokens_approximately(messages)
@@ -122,6 +153,32 @@ def understand_node(state: dict[str, Any]) -> dict[str, Any]:
         trimmed_msgs = messages[-20:] if len(messages) > 20 else messages
 
     try:
+        # Check if we are processing a tool output (last message is a ToolMessage)
+        last_msg = messages[-1] if messages else None
+        if isinstance(last_msg, ToolMessage):
+            # Force structured output for tool responses
+            # Use a specific prompt that tells the LLM to analyze and structure, not call tools
+            structured_system_msg = SystemMessage(content=STRUCTURED_OUTPUT_PROMPT)
+
+            try:
+                structured_llm = llm.with_structured_output(NetworkResponse, method="json_mode")
+                response = structured_llm.invoke([structured_system_msg] + trimmed_msgs)
+
+                # Convert Pydantic model to JSON string for the AIMessage
+                # This ensures the next node (or UI) receives a consistent string format
+                return {"messages": [AIMessage(content=response.model_dump_json())]}
+            except Exception as struct_error:
+                logger.error(f"Structured output error: {struct_error}")
+                # Fallback: return raw tool message content if structuring fails
+                return {
+                    "messages": [
+                        AIMessage(
+                            content=f"Tool output received but could not be structured: {last_msg.content}"
+                        )
+                    ]
+                }
+
+        # Normal chat interaction
         response = llm_with_tools.invoke([system_msg] + trimmed_msgs)
         return {"messages": [response]}
 

@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 """API key for GROQ LLM service."""
 
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-20b")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-120b")
 """Primary LLM model to use for processing requests."""
 
 LLM_TEMPERATURE = 0.0

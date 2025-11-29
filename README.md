@@ -140,8 +140,13 @@ The project follows a flattened, **KISS** architecture leveraging **Nornir** for
     * The Agent cannot execute changes without your explicit "Yes".
 3. **Smart Input Sanitization**:
     * Automatically cleans up LLM outputs (e.g., stripping markdown code blocks from config sets) before sending to devices.
-4. **Structured Output**:
-    * Uses **TextFSM** (via `ntc-templates`) to parse raw CLI output into structured JSON data for the LLM.
+4. **Intelligent Structured Output**:
+    * Uses **LangGraph's `with_structured_output`** to parse raw CLI output into structured JSON with human-readable summaries.
+    * The LLM analyzes device responses and generates:
+        * **Executive Summary**: Markdown-formatted insights highlighting operational status, health, and anomalies.
+        * **Structured Data**: Parsed JSON output (dict/list) for programmatic access.
+        * **Error Detection**: Automatically identifies and reports issues in device output.
+    * Output is beautifully rendered in the console using **Rich** with proper JSON formatting and Markdown rendering.
 
 ---
 
@@ -168,8 +173,10 @@ If you prefer running without Docker:
 
 ## 📚 Tools & Modules
 
-* **`agent.nodes`**: Defines the graph state and interaction logic.
+* **`agent.nodes`**: Defines the graph state, interaction logic, and structured output processing using Pydantic models.
+* **`agent.workflow`**: Assembles the LangGraph workflow with approval routing and execution flow.
 * **`utils.devices`**: Lazy-loads Nornir and injects secrets from environment variables.
+* **`utils.ui`**: Rich-based UI components for beautiful console output with JSON and Markdown rendering.
 * **`tools.show`**: Wraps `nornir_netmiko.netmiko_send_command`.
 * **`tools.config`**: Wraps `nornir_netmiko.netmiko_send_config`.
 

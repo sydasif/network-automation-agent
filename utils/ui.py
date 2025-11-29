@@ -4,6 +4,7 @@ This module provides improved user interface elements with clear separation
 between logging, input, and output using color coding and visual boundaries.
 """
 
+import json
 import logging
 
 from rich.console import Console
@@ -65,7 +66,26 @@ class NetworkAgentUI:
 
         # Display the content - if it's already a Markdown object, print it directly
         if isinstance(content, str):
-            self.console.print(Markdown(content))
+            # Try to parse as JSON first
+            try:
+                json_data = json.loads(content)
+                # If it has the specific structure of our NetworkResponse, print it nicely
+                if isinstance(json_data, dict) and "structured_data" in json_data:
+                    self.console.print("[bold cyan]Structured Data:[/bold cyan]")
+                    self.console.print_json(data=json_data.get("structured_data"))
+
+                    self.console.print("\n[bold green]Summary:[/bold green]")
+                    self.console.print(Markdown(json_data.get("summary", "")))
+                    self.console.print()
+
+                    if json_data.get("errors"):
+                        self.console.print(f"\n[bold red]Errors:[/bold red] {json_data['errors']}")
+                else:
+                    # Generic JSON
+                    self.console.print_json(data=json_data)
+            except json.JSONDecodeError:
+                # Not JSON, treat as Markdown
+                self.console.print(Markdown(content))
         else:
             self.console.print(content)
 
