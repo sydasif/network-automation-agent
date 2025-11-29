@@ -4,10 +4,11 @@ This module provides improved user interface elements with clear separation
 between logging, input, and output using color coding and visual boundaries.
 """
 
+import logging
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
-import logging
 
 
 class NetworkAgentUI:
@@ -142,9 +143,11 @@ class ColoredLogHandler(logging.Handler):
                 return  # Skip these logs to keep UI clean
 
             # Display log message with color-coded level and visual separation
-            self.console.print(
-                f"[{style}]│ {level_prefix}: {record.getMessage()} │[/]", style=style
-            )
+            message = record.getMessage()
+            if record.levelno >= logging.ERROR and "failed with traceback" in message:
+                message = message.splitlines()[0]
+
+            self.console.print(f"[{style}]│ {level_prefix}: {message} │[/]", style=style)
 
         except Exception:
             self.handleError(record)

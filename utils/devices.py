@@ -4,6 +4,11 @@ import logging
 from functools import lru_cache
 from typing import Any, Union
 
+from netmiko.exceptions import (
+    NetmikoAuthenticationException,
+    NetmikoBaseException,
+    NetmikoTimeoutException,
+)
 from nornir import InitNornir
 from nornir.core.filter import F
 
@@ -66,12 +71,21 @@ def execute_nornir_task(
             }
         else:
             # Error case
-            error_str = str(res.exception) if res and res.exception else "Unknown error"
+            error_msg = "Unknown error"
+            if res and res.exception:
+                if isinstance(res.exception, NetmikoTimeoutException):
+                    error_msg = "Connection timed out. Check connectivity and firewall rules."
+                elif isinstance(res.exception, NetmikoAuthenticationException):
+                    error_msg = "Authentication failed. Check device credentials."
+                elif isinstance(res.exception, NetmikoBaseException):
+                    error_msg = f"Netmiko Error: {res.exception}"
+                else:
+                    error_msg = str(res.exception)
 
             output[hostname] = {
                 "success": False,
                 "output": None,
-                "error": error_str,
+                "error": error_msg,
             }
 
     return output
