@@ -6,8 +6,6 @@ supporting structured key-value pairs for better observability.
 
 import logging
 
-from rich.logging import RichHandler
-
 
 def setup_logging(level: int = logging.INFO) -> None:
     """Configure the root logger with the custom formatter.
@@ -15,8 +13,7 @@ def setup_logging(level: int = logging.INFO) -> None:
     Args:
         level: The logging level to set (default: logging.INFO)
     """
-    handler = RichHandler(rich_tracebacks=True, show_path=False, omit_repeated_times=False)
-
+    # Basic configuration - logs will be handled by the UI's colored logging
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
 
@@ -24,4 +21,5 @@ def setup_logging(level: int = logging.INFO) -> None:
     if root_logger.handlers:
         root_logger.handlers.clear()
 
-    root_logger.addHandler(handler)
+    # Don't add any console handlers here to avoid conflicts with UI
+    # Colored logging will be set up separately in the UI module

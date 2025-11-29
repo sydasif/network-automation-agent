@@ -12,14 +12,13 @@ import uuid
 
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
-from rich import print
-from rich.markdown import Markdown
 
 from agent.nodes import RESUME_APPROVED, RESUME_DENIED
 from agent.workflow import create_graph, get_approval_request
+from utils.ui import NetworkAgentUI, setup_colored_logging
 
 
-def run_single_command(app, command: str, config: dict, print_output: bool = True) -> dict:
+def run_single_command(app, command: str, config: dict, print_output: bool = True, ui: NetworkAgentUI = None) -> dict:
     """Execute a single network command through the agent workflow.
 
     This function processes a command by sending it to the agent workflow,
@@ -30,6 +29,7 @@ def run_single_command(app, command: str, config: dict, print_output: bool = Tru
         command: The natural language command to execute.
         config: The configuration dict containing thread_id and other settings.
         print_output: Whether to print the result (True for single command mode, False for interactive mode)
+        ui: The UI instance to use for display
 
     Returns:
         The result of the command execution.
@@ -46,12 +46,15 @@ def run_single_command(app, command: str, config: dict, print_output: bool = Tru
     # We don't need to manually check for "show" commands; the graph won't pause for them.
     # This loop handles multiple approval requests if they occur in sequence
     while tool_call := get_approval_request(snapshot):
-        print("\n[bold yellow]⚠️  CONFIGURATION CHANGE DETECTED ⚠️[/bold yellow]")
-        print(f"Action:  {tool_call['name']}")
-        print(f"Args:    {tool_call['args']}")
+        if ui:
+            ui.print_approval_request(tool_call['name'], tool_call['args'])
+            choice = ui.get_approval_decision()
+        else:
+            print("\n[bold yellow]⚠️  CONFIGURATION CHANGE DETECTED ⚠️[/bold yellow]")
+            print(f"Action:  {tool_call['name']}")
+            print(f"Args:    {tool_call['args']}")
+            choice = input("Proceed with configuration change? (yes/no): ").strip().lower()
 
-        # Get user decision for the configuration change
-        choice = input("Proceed with configuration change? (yes/no): ").strip().lower()
         resume_value = RESUME_APPROVED if choice in ["yes", "y"] else RESUME_DENIED
 
         # Resume the workflow with the user's decision
@@ -64,9 +67,13 @@ def run_single_command(app, command: str, config: dict, print_output: bool = Tru
 
     # Print the final result of the command execution (for single command mode)
     if print_output and "messages" in result and result["messages"]:
-        print("\n" + "-" * 50)
-        print(Markdown(result["messages"][-1].content))
-        print("-" * 50 + "\n")
+        if ui:
+            ui.print_output(result["messages"][-1].content)
+        else:
+            from rich.markdown import Markdown
+            print("\n")
+            print(Markdown(result["messages"][-1].content))
+            print("\n")
 
     return result
 
@@ -82,17 +89,18 @@ def run_interactive_chat(app, initial_device: str = None) -> None:
     session_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": f"session-{session_id}"}}
 
-    print("[bold blue]🚀 Network AI Agent Chat Mode[/bold blue]")
-    print("Enter your network commands or chat (type 'exit' or 'quit' to end the session)\n")
+    # Initialize UI
+    ui = NetworkAgentUI()
+    ui.print_header()
 
     while True:
         try:
             # Get command from user
-            command = input("Ask: ").strip()
+            command = ui.print_command_input_prompt()
 
             # Check for exit commands
             if command.lower() in ["exit", "quit", "q"]:
-                print("[bold blue]👋 Goodbye![/bold blue]")
+                ui.print_goodbye()
                 break
 
             if not command:
@@ -105,27 +113,23 @@ def run_interactive_chat(app, initial_device: str = None) -> None:
                 full_command = command
 
             # Process the command (do not print output in interactive mode as we handle it below)
-            result = run_single_command(app, full_command, config, print_output=False)
+            result = run_single_command(app, full_command, config, print_output=False, ui=ui)
 
             # Print the result of the command execution
             if "messages" in result and result["messages"]:
-                print("\n" + "-" * 50)
-                print(Markdown(result["messages"][-1].content))
-                print("-" * 50 + "\n")
+                ui.print_output(result["messages"][-1].content)
             else:
                 # Handle case where no output is returned (might happen with general chat)
-                print("\n" + "-" * 50)
-                print("Response processed successfully.")
-                print("-" * 50 + "\n")
+                ui.print_output("Response processed successfully.")
 
         except KeyboardInterrupt:
-            print("\n[bold blue]\n👋 Session interrupted. Goodbye![/bold blue]")
+            ui.print_session_interruption()
             break
         except EOFError:
-            print("\n[bold blue]\n👋 Session ended. Goodbye![/bold blue]")
+            ui.print_session_interruption()
             break
         except Exception as e:
-            print(f"[bold red]Error processing command: {e}[/bold red]")
+            ui.print_error(f"Error processing command: {e}")
 
 
 def main() -> None:
@@ -153,9 +157,17 @@ def main() -> None:
 
     # Set up logging with appropriate level
     from utils.logger import setup_logging
+    from rich.console import Console
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     setup_logging(level=log_level)
+
+    # Set up colored logging that doesn't interfere with UI
+    console = Console()
+    log_handler = setup_colored_logging(console)
+
+    # Prevent other loggers from adding their own handlers that would interfere with UI
+    logging.getLogger().setLevel(log_level)
 
     try:
         app = create_graph()
@@ -169,7 +181,8 @@ def main() -> None:
             config = {"configurable": {"thread_id": f"session-{session_id}"}}
 
             command = " ".join(args.command)
-            run_single_command(app, command, config)
+            ui = NetworkAgentUI()  # Use UI for single command mode too
+            run_single_command(app, command, config, ui=ui)
     except Exception as e:
         logging.error(f"Failed to execute command: {e}")
         sys.exit(1)
