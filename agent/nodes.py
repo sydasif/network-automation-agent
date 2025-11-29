@@ -50,8 +50,9 @@ Rules:
 - Multi-device: detect target devices, produce device-specific commands per platform (IOS, EOS, JunOS, etc.).
 
 Output:
-- Concise, device-tagged results (use markdown for clarity).
-- Make a short note of actions taken or errors encountered.
+- Summarize device raw outputs clearly for the user.
+- After summary, format in (headings, tables etc.) markdown.
+- Add a short note of actions taken or errors encountered.
 """
 
 
