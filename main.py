@@ -81,8 +81,8 @@ def run_single_command(
         if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
             for tool_call in last_msg.tool_calls:
                 if tool_call["name"] == "respond":
-                    # Pass the arguments directly to the UI
-                    ui.print_output(json.dumps(tool_call["args"]))
+                    # Pass the arguments directly to the UI as a dictionary, not as JSON string
+                    ui.print_output(tool_call["args"])
                     return result
 
         # Fallback for normal messages
@@ -140,8 +140,8 @@ def run_interactive_chat(app, initial_device: str = None) -> None:
                 if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
                     for tool_call in last_msg.tool_calls:
                         if tool_call["name"] == "respond":
-                            # Pass the arguments directly to the UI
-                            ui.print_output(json.dumps(tool_call["args"]))
+                            # Pass the arguments directly to the UI as a dictionary, not as JSON string
+                            ui.print_output(tool_call["args"])
                             break
                     else:
                         # If tool calls exist but not 'respond' (shouldn't happen at end of graph), print content
