@@ -12,7 +12,6 @@ import uuid
 
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
-from rich.markdown import Markdown
 
 from agent.nodes import RESUME_APPROVED, RESUME_DENIED
 from agent.workflow import create_graph, get_approval_request
@@ -21,7 +20,7 @@ from utils.ui import NetworkAgentUI, setup_colored_logging
 
 
 def run_single_command(
-    app, command: str, config: dict, print_output: bool = True, ui: NetworkAgentUI = None
+    app, command: str, config: dict, ui: NetworkAgentUI, print_output: bool = True
 ) -> dict:
     """Execute a single network command through the agent workflow.
 
@@ -42,7 +41,11 @@ def run_single_command(
     user_input = f"Run command '{command}'"
 
     # Invoke the workflow with the user's command
-    result = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
+    if ui:
+        with ui.thinking_status("Agent is working..."):
+            result = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
+    else:
+        result = app.invoke({"messages": [HumanMessage(content=user_input)]}, config)
     # Get the current state of the workflow to check for pending approvals
     snapshot = app.get_state(config)
 
@@ -50,33 +53,29 @@ def run_single_command(
     # We don't need to manually check for "show" commands; the graph won't pause for them.
     # This loop handles multiple approval requests if they occur in sequence
     while tool_call := get_approval_request(snapshot):
-        if ui:
-            ui.print_approval_request(tool_call["name"], tool_call["args"])
-            choice = ui.get_approval_decision()
-        else:
-            print("\n[bold yellow]⚠️  CONFIGURATION CHANGE DETECTED ⚠️[/bold yellow]")
-            print(f"Action:  {tool_call['name']}")
-            print(f"Args:    {tool_call['args']}")
-            choice = input("Proceed with configuration change? (yes/no): ").strip().lower()
+        ui.print_approval_request(tool_call["name"], tool_call["args"])
+        choice = ui.get_approval_decision()
 
         resume_value = RESUME_APPROVED if choice in ["yes", "y"] else RESUME_DENIED
 
         # Resume the workflow with the user's decision
-        result = app.invoke(
-            Command(resume=resume_value),
-            config,
-        )
+        if ui:
+            with ui.thinking_status("Resuming workflow..."):
+                result = app.invoke(
+                    Command(resume=resume_value),
+                    config,
+                )
+        else:
+            result = app.invoke(
+                Command(resume=resume_value),
+                config,
+            )
         # Update the snapshot for the next iteration
         snapshot = app.get_state(config)
 
     # Print the final result of the command execution (for single command mode)
     if print_output and "messages" in result and len(result["messages"]) > 0:
-        if ui:
-            ui.print_output(result["messages"][-1].content)
-        else:
-            print("\n")
-            print(Markdown(result["messages"][-1].content))
-            print("\n")
+        ui.print_output(result["messages"][-1].content)
 
     return result
 
@@ -102,9 +101,14 @@ def run_interactive_chat(app, initial_device: str = None) -> None:
             command = ui.print_command_input_prompt()
 
             # Check for exit commands
-            if command.lower() in ["exit", "quit", "q"]:
+            if command.lower() in ["exit", "quit", "q", "/exit", "/quit", "/q"]:
                 ui.print_goodbye()
                 break
+
+            # Handle slash commands
+            if command.lower() == "/clear":
+                ui.console.clear()
+                continue
 
             if not command:
                 continue
@@ -116,7 +120,7 @@ def run_interactive_chat(app, initial_device: str = None) -> None:
                 full_command = command
 
             # Process the command (do not print output in interactive mode as we handle it below)
-            result = run_single_command(app, full_command, config, print_output=False, ui=ui)
+            result = run_single_command(app, full_command, config, ui=ui, print_output=False)
 
             # Print the result of the command execution
             if "messages" in result and result["messages"]:

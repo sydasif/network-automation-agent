@@ -7,6 +7,8 @@ between logging, input, and output using color coding and visual boundaries.
 import json
 import logging
 
+from prompt_toolkit import PromptSession
+from prompt_toolkit.styles import Style
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -18,6 +20,16 @@ class NetworkAgentUI:
     def __init__(self):
         self.console = Console()
         self.log_handler = None
+        # Create a style for the prompt
+        self.style = Style.from_dict(
+            {
+                "username": "#ansiblue bold",
+                "at": "#ansigreen",
+                "host": "#ansicyan bold",
+                "colon": "#ansiyellow",
+            }
+        )
+        self.session = PromptSession(style=self.style)
 
     def print_header(self):
         """Print the application header with session information."""
@@ -52,13 +64,16 @@ class NetworkAgentUI:
 
     def print_command_input_prompt(self) -> str:
         """Display input prompt and get command from user."""
-        self.console.print("[bold yellow]Ask:[/bold yellow] ", end="")
-        command = input().strip()
-        return command
-
-    def print_user_input(self, command: str):
-        """Display user's input with appropriate styling."""
-        self.console.print(f"[bold yellow]Ask:[/bold yellow] {command}")
+        # Use prompt_toolkit for input with history
+        message = [
+            ("class:username", "User"),
+            ("class:colon", " > "),
+        ]
+        try:
+            command = self.session.prompt(message).strip()
+            return command
+        except KeyboardInterrupt:
+            return ""
 
     def print_output(self, content: str):
         """Display the command output with clear separation."""
@@ -128,7 +143,11 @@ class NetworkAgentUI:
         self.console.print(
             "[bold white]Proceed with configuration change? (yes/no): [/bold white]", end=""
         )
-        return input().strip().lower()
+        return self.session.prompt().strip().lower()
+
+    def thinking_status(self, message: str = "Thinking..."):
+        """Return a status spinner context manager."""
+        return self.console.status(f"[bold green]{message}[/bold green]", spinner="dots")
 
 
 class ColoredLogHandler(logging.Handler):
