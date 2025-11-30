@@ -10,6 +10,7 @@ import logging
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
 
@@ -75,37 +76,44 @@ class NetworkAgentUI:
         except KeyboardInterrupt:
             return ""
 
-    def print_output(self, content: str):
+    def _print_structured_data(self, data: dict):
+        """Helper to print structured network response."""
+        self.console.print("[bold cyan]Structured Data:[/bold cyan]")
+        self.console.print_json(data=data.get("structured_data"))
+
+        self.console.print("\n[bold green]Summary:[/bold green]")
+        self.console.print(Markdown(data.get("summary", "")))
+        self.console.print()
+
+        if data.get("errors"):
+            self.console.print(f"\n[bold red]Errors:[/bold red] {data['errors']}")
+
+    def print_output(self, content: str | dict):
         """Display the command output with clear separation."""
-        from rich.markdown import Markdown
 
-        # Display the content - if it's already a Markdown object, print it directly
+        data_to_print = content
+
+        # 1. Normalize input to dict if possible
         if isinstance(content, str):
-            # Try to parse as JSON first
             try:
-                json_data = json.loads(content)
-                # If it has the specific structure of our NetworkResponse, print it nicely
-                if isinstance(json_data, dict) and "structured_data" in json_data:
-                    self.console.print("[bold cyan]Structured Data:[/bold cyan]")
-                    self.console.print_json(data=json_data.get("structured_data"))
-
-                    self.console.print("\n[bold green]Summary:[/bold green]")
-                    self.console.print(Markdown(json_data.get("summary", "")))
-                    self.console.print()
-
-                    if json_data.get("errors"):
-                        self.console.print(f"\n[bold red]Errors:[/bold red] {json_data['errors']}")
-                else:
-                    # Generic JSON
-                    self.console.print_json(data=json_data)
+                data_to_print = json.loads(content)
             except json.JSONDecodeError:
-                # Not JSON, treat as Markdown
+                # Not JSON, treat as Markdown string
                 self.console.print(Markdown(content))
+                self.console.print()  # Empty line
+                return
+
+        # 2. Print based on type
+        if isinstance(data_to_print, dict) and "structured_data" in data_to_print:
+            self._print_structured_data(data_to_print)
+        elif isinstance(data_to_print, (dict, list)):
+            self.console.print_json(data=data_to_print)
         else:
+            # Fallback for non-json string or other types
             self.console.print(content)
 
         # Add empty line for spacing
-        self.console.print()  # Empty line for spacing
+        self.console.print()
 
     def print_logging_separator(self):
         """Print a separator specifically for logging messages."""
@@ -140,10 +148,10 @@ class NetworkAgentUI:
 
     def get_approval_decision(self) -> str:
         """Get user decision for approval with styling."""
-        self.console.print(
-            "[bold white]Proceed with configuration change? (yes/no): [/bold white]", end=""
-        )
-        return self.session.prompt().strip().lower()
+        message = [
+            ("bold", "Proceed with configuration change? (yes/no): "),
+        ]
+        return self.session.prompt(message).strip().lower()
 
     def thinking_status(self, message: str = "Thinking..."):
         """Return a status spinner context manager."""

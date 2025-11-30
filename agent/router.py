@@ -9,11 +9,13 @@ from typing import Literal
 from langchain_core.messages import ToolMessage
 from langgraph.graph import END
 
-from agent.nodes import NODE_APPROVAL, NODE_EXECUTE, NODE_UNDERSTAND, State
+from agent.nodes import NODE_APPROVAL, NODE_EXECUTE, NODE_PLANNER, NODE_UNDERSTAND, State
 from tools.config import config_command
+from tools.plan import plan_task
+from tools.response import respond
 
 
-def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:
+def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, NODE_PLANNER, "end"]:
     """Route the workflow based on the tool called in the last message.
 
     Determines whether the workflow should proceed to execution or approval
@@ -39,6 +41,12 @@ def route_tools(state: State) -> Literal[NODE_EXECUTE, NODE_APPROVAL, "end"]:
     # Route to approval for config commands that modify device configuration
     if tool_name == config_command.name:
         return NODE_APPROVAL
+
+    if tool_name == plan_task.name:
+        return NODE_PLANNER
+
+    if tool_name == respond.name:
+        return END
 
     # For other commands (like show commands), execute directly
     return NODE_EXECUTE

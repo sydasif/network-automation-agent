@@ -29,9 +29,11 @@ def _get_nornir() -> InitNornir:
 
 @lru_cache(maxsize=1)
 def get_device_info() -> str:
-    """Return a formatted string of devices and platforms (Cached)."""
+    """Return formatted string of devices and platforms.
+
+    Cached to avoid redundant lookups and ensure deterministic LLM prompts.
+    """
     nr = _get_nornir()
-    # Sorting ensures the string is deterministic, helping LLM caching
     sorted_hosts = sorted(nr.inventory.hosts.items())
     return "\n".join(
         f"- {name} (Platform: {host.platform or 'unknown'})" for name, host in sorted_hosts
@@ -43,34 +45,40 @@ def execute_nornir_task(
     task_function: callable,
     **kwargs,
 ) -> dict[str, Any]:
-    """Execute Nornir task with network-aware error handling."""
+    """Execute Nornir task with network-aware error handling.
+
+    Args:
+        target_devices: Single device or list of devices to target
+        task_function: Nornir task function to execute
+        **kwargs: Additional arguments to pass to task function
+
+    Returns:
+        Dict mapping hostname to execution result with success/error info
+    """
     targets = {target_devices} if isinstance(target_devices, str) else set(target_devices)
     nr = _get_nornir()
 
     available_hosts = set(nr.inventory.hosts.keys())
 
-    # Fast validation
     if invalid := targets - available_hosts:
         return {"error": f"Devices not found: {list(invalid)}"}
 
-    # Filter and Run
     filtered_nr = nr.filter(F(name__any=list(targets)))
     results = filtered_nr.run(task=task_function, **kwargs)
 
-    # Transform Results
+    # Transform Nornir results into standardized format
     output = {}
     for hostname, multi_result in results.items():
         res = multi_result[0] if multi_result else None
 
         if not multi_result.failed and res:
-            # Success case
             output[hostname] = {
                 "success": True,
                 "output": res.result,
                 "error": None,
             }
         else:
-            # Error case
+            # Map Netmiko exceptions to user-friendly error messages
             error_msg = "Unknown error"
             if res and res.exception:
                 if isinstance(res.exception, NetmikoTimeoutException):

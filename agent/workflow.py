@@ -11,10 +11,12 @@ from langgraph.types import StateSnapshot
 from agent.nodes import (
     NODE_APPROVAL,
     NODE_EXECUTE,
+    NODE_PLANNER,
     NODE_UNDERSTAND,
     State,
     approval_node,
     execute_node,
+    planner_node,
     understand_node,
 )
 from agent.router import route_approval, route_tools
@@ -39,6 +41,7 @@ def create_graph():
     # Add the three main nodes to the workflow
     workflow.add_node(NODE_UNDERSTAND, understand_node)
     workflow.add_node(NODE_APPROVAL, approval_node)
+    workflow.add_node(NODE_PLANNER, planner_node)
     workflow.add_node(NODE_EXECUTE, execute_node)
 
     # Set the starting node for the workflow
@@ -48,7 +51,12 @@ def create_graph():
     workflow.add_conditional_edges(
         NODE_UNDERSTAND,
         route_tools,
-        {NODE_EXECUTE: NODE_EXECUTE, NODE_APPROVAL: NODE_APPROVAL, END: END},
+        {
+            NODE_EXECUTE: NODE_EXECUTE,
+            NODE_APPROVAL: NODE_APPROVAL,
+            NODE_PLANNER: NODE_PLANNER,
+            END: END,
+        },
     )
     # Add conditional routing from Approval node based on user decision
     workflow.add_conditional_edges(
@@ -59,6 +67,7 @@ def create_graph():
 
     # LOOP: Execution output goes back to Understand to be formatted for user response
     workflow.add_edge(NODE_EXECUTE, NODE_UNDERSTAND)
+    workflow.add_edge(NODE_PLANNER, NODE_UNDERSTAND)
 
     # Compile the workflow with a memory saver for state persistence
     return workflow.compile(checkpointer=MemorySaver())

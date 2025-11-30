@@ -6,6 +6,7 @@ Supports both single command execution and interactive chat mode.
 """
 
 import argparse
+import json
 import logging
 import sys
 import uuid
@@ -75,7 +76,17 @@ def run_single_command(
 
     # Print the final result of the command execution (for single command mode)
     if print_output and "messages" in result and len(result["messages"]) > 0:
-        ui.print_output(result["messages"][-1].content)
+        last_msg = result["messages"][-1]
+        # Check if it's a tool call to 'respond'
+        if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+            for tool_call in last_msg.tool_calls:
+                if tool_call["name"] == "respond":
+                    # Pass the arguments directly to the UI
+                    ui.print_output(json.dumps(tool_call["args"]))
+                    return result
+
+        # Fallback for normal messages
+        ui.print_output(last_msg.content)
 
     return result
 
@@ -124,7 +135,20 @@ def run_interactive_chat(app, initial_device: str = None) -> None:
 
             # Print the result of the command execution
             if "messages" in result and result["messages"]:
-                ui.print_output(result["messages"][-1].content)
+                last_msg = result["messages"][-1]
+                # Check if it's a tool call to 'respond'
+                if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+                    for tool_call in last_msg.tool_calls:
+                        if tool_call["name"] == "respond":
+                            # Pass the arguments directly to the UI
+                            ui.print_output(json.dumps(tool_call["args"]))
+                            break
+                    else:
+                        # If tool calls exist but not 'respond' (shouldn't happen at end of graph), print content
+                        if last_msg.content:
+                            ui.print_output(last_msg.content)
+                else:
+                    ui.print_output(last_msg.content)
             else:
                 # Handle case where no output is returned (might happen with general chat)
                 ui.print_output("Response processed successfully.")

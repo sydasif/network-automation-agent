@@ -147,6 +147,10 @@ The project follows a flattened, **KISS** architecture leveraging **Nornir** for
         * **Structured Data**: Parsed JSON output (dict/list) for programmatic access.
         * **Error Detection**: Automatically identifies and reports issues in device output.
     * Output is beautifully rendered in the console using **Rich** with proper JSON formatting and Markdown rendering.
+5. **Planning Capability**:
+    * For complex requests (e.g., "Upgrade all switches"), the agent uses a **Planner** node to break down the task into logical steps before execution.
+6. **Context Management**:
+    * Intelligent memory management summarizes long conversations to retain key context without hitting token limits.
 
 ---
 
@@ -179,6 +183,16 @@ If you prefer running without Docker:
 * **`utils.ui`**: Rich-based UI components for beautiful console output with JSON and Markdown rendering.
 * **`tools.show`**: Wraps `nornir_netmiko.netmiko_send_command`.
 * **`tools.config`**: Wraps `nornir_netmiko.netmiko_send_config`.
+* **`tools.plan`**: Generates execution plans for complex tasks.
+
+## 🧪 Testing
+
+The project uses **pytest** for testing.
+
+```bash
+# Run tests
+uv run pytest
+```
 
 ## 🤝 Contributing
 

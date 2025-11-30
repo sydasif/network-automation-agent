@@ -5,7 +5,7 @@ from nornir_netmiko.tasks import netmiko_send_command
 from pydantic import BaseModel, Field
 
 from utils.devices import execute_nornir_task
-from utils.responses import error, passthrough, success
+from utils.responses import error, process_nornir_result
 
 
 class ShowInput(BaseModel):
@@ -17,24 +17,24 @@ class ShowInput(BaseModel):
 
 @tool(args_schema=ShowInput)
 def show_command(devices: list[str], command: str) -> str:
-    """Execute a read-only 'show' command on one or more devices."""
+    """Execute a read-only 'show' command on one or more devices.
 
-    # 1. Validation
+    Args:
+        devices: List of device hostnames to target
+        command: Show command to execute
+
+    Returns:
+        JSON string with device results
+    """
     if not devices:
         return error("No devices specified.")
     if not command.strip():
         return error("Command cannot be empty.")
 
-    # 2. Execution (KISS: No manual looping, let Nornir handle it)
     results = execute_nornir_task(
         target_devices=devices,
         task_function=netmiko_send_command,
         command_string=command,
     )
 
-    # 3. Error Handling for global failures (e.g., device not found)
-    if "error" in results and len(results) == 1:
-        return passthrough(results)
-
-    # 4. Return structured JSON
-    return success(results, command=command)
+    return process_nornir_result(results, command=command)
