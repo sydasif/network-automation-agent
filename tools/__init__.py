@@ -1,8 +1,47 @@
-"""Network automation tools for the Network AI Agent.
+"""Network automation tools package.
 
-This package contains tools for interacting with network devices:
-- show.py: Read-only show commands
-- config.py: Configuration change commands
-- plan.py: Planning tool for complex tasks
-- response.py: Final response formatting
+This package provides all network automation tools using a plugin-like architecture.
+Tools can be added/removed by creating new tool classes and registering them here.
 """
+
+from core.task_executor import TaskExecutor
+from tools.base_tool import NetworkTool
+from tools.config_tool import ConfigCommandTool
+from tools.plan_tool import PlannerTool
+from tools.response_tool import ResponseTool
+from tools.show_tool import ShowCommandTool
+
+
+def get_all_tools(task_executor: TaskExecutor) -> list:
+    """Get all available network automation tools.
+
+    This is the tool registry. To add a new tool:
+    1. Create a new tool class inheriting from NetworkTool
+    2. Import it above
+    3. Add it to the list below
+
+    Args:
+        task_executor: TaskExecutor instance for tools that need it
+
+    Returns:
+        List of LangChain-compatible tool instances
+    """
+    tools = [
+        ShowCommandTool(task_executor),
+        ConfigCommandTool(task_executor),
+        PlannerTool(),
+        ResponseTool(),
+    ]
+
+    # Convert to LangChain tool format
+    return [tool.to_langchain_tool() for tool in tools]
+
+
+__all__ = [
+    "NetworkTool",
+    "ShowCommandTool",
+    "ConfigCommandTool",
+    "PlannerTool",
+    "ResponseTool",
+    "get_all_tools",
+]

@@ -1,203 +1,348 @@
-<div align="center">
+# Network Automation Agent 🤖
 
-<img src="https://github.com/sydasif/sydasif.github.io/blob/main/assets/img/favicons/favicon-96x96.png" alt="Network AI Agent Logo" width="120"/>
+An AI-powered network automation assistant that uses natural language to manage network devices. Built with LangGraph, Groq LLM, and Nornir.
 
-# Network AI Agent
+## ✨ Features
 
-**A powerful, AI-driven tool for seamless network automation and management.**
-
-<p>
-    <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.12%2B-blue"></a>
-    <a href="#"><img src="https://img.shields.io/badge/License-MIT-green"></a>
-    <a href="https://nornir.tech/"><img src="https://img.shields.io/badge/Powered%20By-Nornir-blueviolet"></a>
-    <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-Ready-blue"></a>
-</p>
-
-</div>
-
-A lightweight, "Human-in-the-Loop" AI agent that translates natural language into network configuration and show commands. Built with **LangGraph**, **Nornir**, and **Rich**.
-
-## 🚀 Quick Start (Docker)
-
-The easiest way to run the agent is using Docker. This ensures a consistent environment.
-
-### 1. Setup
-
-```bash
-git clone https://github.com/yourusername/network-agent.git
-cd network-agent
-```
-
-### 2. Configuration
-
-Create your secrets and inventory files.
-
-**`.env`** (Secrets):
-
-```ini
-GROQ_API_KEY=gsk_your_api_key_here
-```
-
-**`hosts.yaml`** (Inventory):
-
-```yaml
----
-sw1:
-  hostname: 192.168.1.10
-  groups: [cisco]
-sw2:
-  hostname: 192.168.1.11
-  groups: [cisco]
-```
-
-**`groups.yaml`** (Platform Definitions):
-
-```yaml
----
-cisco:
-  platform: cisco_ios
-  username: admin
-  password: admin
-
-arista:
-  platform: arista_eos
-  username: admin
-  password: admin
-```
-
-### 3. Run
-
-```bash
-docker compose up --build
-```
-
----
-
-## 🐳 Docker Usage
-
-The agent now runs in CLI mode only with both single command and interactive chat capabilities. Here are the ways to use it:
-
-### Option 1: Run a single command
-
-```bash
-docker compose run --rm network-agent-cli python main.py "show ip interface brief"
-```
-
-### Option 2: Interactive chat mode (recommended)
-
-```bash
-# Start an interactive chat session
-docker compose run --rm -it network-agent-cli python main.py --chat
-
-# Or with a specific device
-docker compose run --rm -it network-agent-cli python main.py --chat --device sw1
-```
-
-### Option 3: Start the container and run commands interactively
-
-```bash
-# Start the container in detached mode
-docker compose up -d
-
-# Execute a single command in the running container
-docker compose exec network-agent-cli python main.py "show version on device1"
-
-# Start an interactive chat session in the running container
-docker compose exec -it network-agent-cli python main.py --chat
-
-# For interactive shell access
-docker compose exec -it network-agent-cli bash
-# Then run: python main.py --chat  (for chat mode)
-# Or run: python main.py "your command here"  (for single command)
-```
-
-### Option 4: Interactive shell session
-
-```bash
-docker compose run --rm -it network-agent-cli bash
-# Then run your commands inside the container
-```
-
----
+- **Natural Language Interface**: Describe what you want in plain English
+- **Multi-Device Support**: Execute commands across multiple devices simultaneously
+- **Human-in-the-Loop**: Configuration changes require approval before execution
+- **Structured Output**: Clean JSON and Markdown formatted results
+- **Interactive Chat**: Conversational interface for network operations
+- **Plugin Architecture**: Easily add new tools and capabilities
 
 ## 🏗️ Architecture
 
-The project follows a flattened, **KISS** architecture leveraging **Nornir** for parallel execution:
+The application follows a **modular, class-based architecture** with clear separation of concerns:
 
-| Component | File | Purpose |
-| :--- | :--- | :--- |
-| **Brain** | `agent/` | LangGraph workflow, prompts, and decision routing. |
-| **Hands** | `tools/` | Split into `show.py` (Read) and `config.py` (Write). |
-| **Engine** | `utils/devices.py` | **Nornir** initialization and task execution engine. |
-| **CLI** | `main.py` | Terminal entry point. |
+```
+┌─────────────────────────────────────────────────┐
+│                   main.py                       │
+│            (CLI Entry Point)                    │
+└──────────────────┬──────────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────────┐
+│              cli/                               │
+│  • NetworkAgentCLI (Application Lifecycle)      │
+│  • CommandProcessor (Parsing & Validation)      │
+└──────────────────┬──────────────────────────────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+┌───────▼────────┐    ┌──────▼──────┐
+│   agent/       │    │    ui/      │
+│ • Workflow     │    │ • Console   │
+│ • Nodes        │    │ • Logging   │
+└───────┬────────┘    └─────────────┘
+        │
+   ┌────┴────┐
+   │         │
+┌──▼──┐  ┌──▼────┐
+│tools│  │ core/ │
+│     │  │       │
+└─────┘  └───────┘
+```
 
-### Key Features
+### Package Structure
 
-1. **Parallel Execution**:
-    * Uses **Nornir** to execute read-only commands (`show version`) on hundreds of devices simultaneously.
-2. **Safety First**:
-    * **Sequential Configs**: Configuration changes are handled sequentially with a **Human-in-the-Loop** approval step for every batch.
-    * The Agent cannot execute changes without your explicit "Yes".
-3. **Smart Input Sanitization**:
-    * Automatically cleans up LLM outputs (e.g., stripping markdown code blocks from config sets) before sending to devices.
-4. **Intelligent Structured Output**:
-    * Uses **LangGraph's `with_structured_output`** to parse raw CLI output into structured JSON with human-readable summaries.
-    * The LLM analyzes device responses and generates:
-        * **Executive Summary**: Markdown-formatted insights highlighting operational status, health, and anomalies.
-        * **Structured Data**: Parsed JSON output (dict/list) for programmatic access.
-        * **Error Detection**: Automatically identifies and reports issues in device output.
-    * Output is beautifully rendered in the console using **Rich** with proper JSON formatting and Markdown rendering.
-5. **Planning Capability**:
-    * For complex requests (e.g., "Upgrade all switches"), the agent uses a **Planner** node to break down the task into logical steps before execution.
-6. **Context Management**:
-    * Intelligent memory management summarizes long conversations to retain key context without hitting token limits.
+- **`core/`** - Infrastructure (Config, Nornir, Device Inventory, Task Executor, LLM Provider)
+- **`tools/`** - Network automation tools (Show, Config, Plan, Response)
+- **`agent/`** - LangGraph workflow and node implementations
+- **`cli/`** - Application lifecycle and command processing
+- **`ui/`** - Console UI and logging
 
----
+### Key Classes
 
-## 🛠️ Local Development
+**Core Infrastructure:**
 
-If you prefer running without Docker:
+- `NetworkAgentConfig` - Centralized configuration management
+- `NornirManager` - Nornir instance lifecycle
+- `DeviceInventory` - Device information and validation
+- `TaskExecutor` - Network task execution with error handling
+- `LLMProvider` - LLM instance management
 
-1. **Install Dependencies**:
+**Agent Workflow:**
 
-    ```bash
-    # Using uv (Recommended)
-    uv sync
-    # Or standard pip
-    pip install -r requirements.txt
-    ```
+- `NetworkAgentWorkflow` - Workflow orchestration
+- `UnderstandNode` - Input processing & output structuring
+- `ApprovalNode` - Human-in-the-loop approval
+- `ExecuteNode` - Tool execution
+- `PlannerNode` - Complex task planning
 
-2. **Run CLI**:
+**Tools:**
 
-    ```bash
-    python main.py "Show ip int brief on sw1"
-    ```
+- `ShowCommandTool` - Read-only show commands
+- `ConfigCommandTool` - Configuration changes
+- `PlannerTool` - Task planning
+- `ResponseTool` - Final responses
 
----
+## 🚀 Quick Start
 
-## 📚 Tools & Modules
+### Prerequisites
 
-* **`agent.nodes`**: Defines the graph state, interaction logic, and structured output processing using Pydantic models.
-* **`agent.workflow`**: Assembles the LangGraph workflow with approval routing and execution flow.
-* **`utils.devices`**: Lazy-loads Nornir and injects secrets from environment variables.
-* **`utils.ui`**: Rich-based UI components for beautiful console output with JSON and Markdown rendering.
-* **`tools.show`**: Wraps `nornir_netmiko.netmiko_send_command`.
-* **`tools.config`**: Wraps `nornir_netmiko.netmiko_send_config`.
-* **`tools.plan`**: Generates execution plans for complex tasks.
+- Python 3.12+
+- `uv` package manager
+- Network devices with SSH access
+- Groq API key
 
-## 🧪 Testing
-
-The project uses **pytest** for testing.
+### Installation
 
 ```bash
-# Run tests
-uv run pytest
+# Clone the repository
+git clone <repository-url>
+cd network-automation-agent
+
+# Install dependencies
+uv sync
+
+# Set up environment
+cp .env.example .env
+# Edit .env and add your GROQ_API_KEY
 ```
+
+### Configuration
+
+1. **Environment Variables** (`.env`):
+
+```bash
+GROQ_API_KEY=your_groq_api_key_here
+LLM_MODEL_NAME=llama-3.3-70b-versatile
+NUM_WORKERS=20
+NETMIKO_TIMEOUT=30
+```
+
+2. **Nornir Configuration** (`config.yaml`):
+
+```yaml
+inventory:
+  plugin: SimpleInventory
+  options:
+    host_file: "network/devices/hosts.yaml"
+    group_file: "network/devices/groups.yaml"
+    defaults_file: "network/devices/defaults.yaml"
+```
+
+3. **Device Inventory** (`network/devices/hosts.yaml`):
+
+```yaml
+---
+R1:
+  hostname: 172.16.1.101
+  groups:
+    - arista_ceos
+  data:
+    role: router
+
+S1:
+  hostname: 172.16.1.102
+  groups:
+    - cisco_ios
+  data:
+    role: switch
+```
+
+## 💻 Usage
+
+### Single Command Mode
+
+Execute a single command:
+
+```bash
+uv run python main.py "show version on R1"
+```
+
+With device specified:
+
+```bash
+uv run python main.py "show ip interface brief" --device R1
+```
+
+### Interactive Chat Mode
+
+Start an interactive session:
+
+```bash
+uv run python main.py --chat
+```
+
+Example conversation:
+
+```
+User > show version on R1
+[Structured output with device details]
+
+User > add loopback9 with ip 9.9.9.9/32 on R1
+[Approval prompt for configuration change]
+Proceed? (yes/no): yes
+[Configuration applied successfully]
+```
+
+### Debug Mode
+
+Enable detailed logging:
+
+```bash
+uv run python main.py --debug --chat
+```
+
+## 🔧 Development
+
+### Project Structure
+
+```
+network-automation-agent/
+├── main.py                 # Entry point
+├── core/                   # Core infrastructure
+│   ├── config.py
+│   ├── nornir_manager.py
+│   ├── device_inventory.py
+│   ├── task_executor.py
+│   └── llm_provider.py
+├── tools/                  # Network tools
+│   ├── base_tool.py
+│   ├── show_tool.py
+│   ├── config_tool.py
+│   ├── plan_tool.py
+│   └── response_tool.py
+├── agent/                  # Workflow & nodes
+│   ├── workflow_manager.py
+│   ├── state.py
+│   └── nodes/
+│       ├── base_node.py
+│       ├── understand_node.py
+│       ├── approval_node.py
+│       ├── planner_node.py
+│       └── execute_node.py
+├── cli/                    # CLI application
+│   ├── application.py
+│   └── command_processor.py
+├── ui/                     # User interface
+│   └── console_ui.py
+├── utils/                  # Utilities
+│   ├── logger.py
+│   └── responses.py
+└── tests/                  # Test suite
+    ├── unit/
+    └── integration/
+```
+
+### Adding a New Tool
+
+1. Create a new tool class in `tools/`:
+
+```python
+from tools.base_tool import NetworkTool
+
+class MyCustomTool(NetworkTool):
+    @property
+    def name(self) -> str:
+        return "my_custom_tool"
+
+    @property
+    def description(self) -> str:
+        return "Description of what the tool does"
+
+    @property
+    def args_schema(self) -> type[BaseModel]:
+        return MyCustomInput
+
+    def _execute_impl(self, **kwargs) -> str:
+        # Implementation here
+        pass
+```
+
+2. Register in `tools/__init__.py`:
+
+```python
+from tools.my_custom_tool import MyCustomTool
+
+def get_all_tools(task_executor: TaskExecutor) -> list:
+    tools = [
+        ShowCommandTool(task_executor),
+        ConfigCommandTool(task_executor),
+        MyCustomTool(task_executor),  # Add here
+        # ...
+    ]
+    return [tool.to_langchain_tool() for tool in tools]
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=. --cov-report=html
+
+# Run specific test file
+uv run pytest tests/unit/test_core/test_config.py
+```
+
+### Code Quality
+
+```bash
+# Lint and format
+uv run ruff check . --fix
+uv run ruff format .
+
+# Type checking
+uv run mypy .
+```
+
+## 📚 Key Concepts
+
+### Dependency Injection
+
+All classes receive their dependencies via constructors:
+
+```python
+# In NetworkAgentCLI
+self._nornir_manager = NornirManager(config)
+self._device_inventory = DeviceInventory(self._nornir_manager)
+self._task_executor = TaskExecutor(self._nornir_manager)
+```
+
+### Plugin Architecture
+
+Tools are discovered and loaded through the registry:
+
+```python
+tools = get_all_tools(task_executor)  # All tools loaded dynamically
+```
+
+### LangGraph Workflow
+
+The agent uses LangGraph for workflow orchestration:
+
+1. **Understand** - Process input or structure output
+2. **Approval** - Request human approval for config changes
+3. **Execute** - Run the tools
+4. **Plan** - Break down complex tasks
 
 ## 🤝 Contributing
 
-1. Fork the repo
+1. Fork the repository
 2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+3. Make your changes
+4. Ensure tests pass and code is linted
+5. Submit a pull request
+
+## 📝 License
+
+[Your License Here]
+
+## 🙏 Acknowledgments
+
+- **LangGraph** - Workflow orchestration
+- **Groq** - Fast LLM inference
+- **Nornir** - Network automation framework
+- **Netmiko** - Multi-vendor SSH library
+
+## 📞 Support
+
+For issues and questions, please open an issue on GitHub.
+
+---
+
+**Made with ❤️ for Network Engineers**

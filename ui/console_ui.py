@@ -183,9 +183,11 @@ class ColoredLogHandler(logging.Handler):
                 level_prefix = "DEBUG"
 
             # Skip very verbose logs from third-party libraries that clutter the UI
-            from settings import LOG_SKIP_MODULES
+            from core.config import NetworkAgentConfig
 
-            if any(skip_name in record.name for skip_name in LOG_SKIP_MODULES):
+            # Get log skip modules from config
+            config = NetworkAgentConfig()
+            if any(skip_name in record.name for skip_name in config.log_skip_modules):
                 return  # Skip these logs to keep UI clean
 
             # Display log message with color-coded level and visual separation
