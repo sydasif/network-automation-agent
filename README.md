@@ -15,7 +15,7 @@ An AI-powered network automation assistant that uses natural language to manage 
 
 The application follows a **modular, class-based architecture** with clear separation of concerns:
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
 │                   main.py                       │
 │            (CLI Entry Point)                    │
@@ -106,9 +106,6 @@ cp .env.example .env
 
 ```bash
 GROQ_API_KEY=your_groq_api_key_here
-LLM_MODEL_NAME=llama-3.3-70b-versatile
-NUM_WORKERS=20
-NETMIKO_TIMEOUT=30
 ```
 
 2. **Nornir Configuration** (`config.yaml`):
@@ -117,28 +114,49 @@ NETMIKO_TIMEOUT=30
 inventory:
   plugin: SimpleInventory
   options:
-    host_file: "network/devices/hosts.yaml"
-    group_file: "network/devices/groups.yaml"
-    defaults_file: "network/devices/defaults.yaml"
+    host_file: "hosts.yaml"
+    group_file: "groups.yaml"
+runner:
+  plugin: threaded
+  options:
+    num_workers: 20
+logging:
+  enabled: false
+defaults:
+  connection_options:
+    netmiko:
+      extras:
+        timeout: 30
+        conn_timeout: 10
+        session_timeout: 60
 ```
 
-3. **Device Inventory** (`network/devices/hosts.yaml`):
+3. **Device Inventory** (`hosts.yaml`):
 
 ```yaml
----
 R1:
-  hostname: 172.16.1.101
-  groups:
-    - arista_ceos
-  data:
-    role: router
+  hostname: 192.168.121.101
+  groups: [arista]
+sw1:
+  hostname: 192.168.121.102
+  groups: [cisco]
+sw2:
+  hostname: 192.168.121.103
+  groups: [cisco]
+```
 
-S1:
-  hostname: 172.16.1.102
-  groups:
-    - cisco_ios
-  data:
-    role: switch
+4. **Groups Inventory** (`groups.yaml`):
+
+```yaml
+cisco:
+  platform: cisco_ios
+  username: admin
+  password: admin
+
+arista:
+  platform: arista_eos
+  username: admin
+  password: admin
 ```
 
 ## 💻 Usage
@@ -167,7 +185,7 @@ uv run python main.py --chat
 
 Example conversation:
 
-```
+```terminal
 User > show version on R1
 [Structured output with device details]
 
@@ -189,7 +207,7 @@ uv run python main.py --debug --chat
 
 ### Project Structure
 
-```
+```bash
 network-automation-agent/
 ├── main.py                 # Entry point
 ├── core/                   # Core infrastructure
