@@ -8,7 +8,6 @@ import logging
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
-from pydantic import BaseModel, Field
 
 from agent.nodes.base_node import AgentNode
 
@@ -21,16 +20,17 @@ Your job is to break down complex user requests into a series of logical steps.
 
 User Request: {user_request}
 
+CRITICAL RULES:
+- Reference ONLY devices from the user's network inventory (do NOT make up device names)
+- Match commands to device platforms (IOS, EOS, JunOS, etc.)
+- Each step must be specific, actionable, and executable
+- Do NOT make assumptions about current network state
+- Break down complex operations into simple, verifiable steps
+
 Return a list of steps to accomplish this task.
-Each step should be a clear, actionable description.
-Do not generate code or commands yet, just the plan.
+Each step should be a clear, actionable description with specific device names and commands.
+Do not generate actual code or full configurations yet, just the high-level plan.
 """
-
-
-class Plan(BaseModel):
-    """A list of steps to complete a task."""
-
-    steps: list[str] = Field(description="List of steps to execute.")
 
 
 class PlannerNode(AgentNode):
@@ -49,6 +49,9 @@ class PlannerNode(AgentNode):
         Returns:
             Updated state with plan as AI message
         """
+        import json
+        import re
+
         messages = state.get("messages", [])
         if not messages:
             return state
@@ -62,19 +65,50 @@ class PlannerNode(AgentNode):
             # Fallback: use the last message content
             user_request = str(last_msg.content)
 
-        # Generate plan using structured LLM
-        structured_llm = self._get_structured_llm(Plan)
+        # Generate plan using plain LLM (not structured output due to Groq API issues)
+        llm = self._get_llm()
         prompt = PLANNER_PROMPT.format(user_request=user_request)
 
+        # Add JSON format instruction
+        json_instruction = (
+            "\n\nReturn your response as a JSON object with this exact format:\n"
+            '{"steps": ["step 1 description", "step 2 description", ...]}'
+        )
+        full_prompt = prompt + json_instruction
+
         try:
-            plan = structured_llm.invoke(prompt)
+            response = llm.invoke(full_prompt)
+            response_text = response.content
+
+            # Try to extract JSON from the response
+            try:
+                # First try: parse whole response as JSON
+                parsed = json.loads(response_text)
+            except json.JSONDecodeError:
+                # Second try: find JSON in markdown code blocks
+                json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group(1))
+                else:
+                    # Third try: find JSON object in text
+                    json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+                    if json_match:
+                        parsed = json.loads(json_match.group(0))
+                    else:
+                        raise ValueError("No JSON found in response")
+
+            # Validate and extract steps
+            if "steps" in parsed and isinstance(parsed["steps"], list):
+                steps = parsed["steps"]
+            else:
+                raise ValueError("Invalid plan format - missing 'steps' array")
 
             # Format plan as a numbered list
             plan_str = "I have created a plan:\n" + "\n".join(
-                [f"{i + 1}. {step}" for i, step in enumerate(plan.steps)]
+                [f"{i + 1}. {step}" for i, step in enumerate(steps)]
             )
 
-            logger.info(f"Generated plan with {len(plan.steps)} steps")
+            logger.info(f"Generated plan with {len(steps)} steps")
 
             return {"messages": [AIMessage(content=plan_str)]}
 

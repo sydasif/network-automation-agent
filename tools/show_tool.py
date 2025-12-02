@@ -43,8 +43,12 @@ class ShowCommandTool(NetworkTool):
     def description(self) -> str:
         """Tool description."""
         return (
-            "Execute a read-only 'show' command on one or more network devices. "
-            "Use this for gathering information without making changes."
+            "Execute read-only 'show' commands on network devices. "
+            "Use for: viewing configurations, checking interface status, displaying routing tables, "
+            "viewing ARP/MAC tables, checking system information. "
+            "REQUIREMENT: All device names MUST be from the inventory - do not make up device names. "
+            "Platform-specific: Use 'show' for Cisco IOS/EOS, 'display' for Huawei, etc. "
+            "This tool is NON-DESTRUCTIVE and does not modify device configuration."
         )
 
     @property

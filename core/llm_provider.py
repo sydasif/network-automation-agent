@@ -62,16 +62,29 @@ class LLMProvider:
     def create_structured_llm(self, schema: type[BaseModel]):
         """Create LLM with structured output.
 
-        Uses function_calling method which is compatible with Groq's API.
+        **DEPRECATED - Groq API Incompatibility**:
+        The `with_structured_output()` method causes Groq API errors:
+        - Error: "Tool choice is required, but model did not call a tool"
+        - Error: "parameters for tool X did not match schema"
+
+        **Recommendation**: Use manual JSON parsing instead.
+        See UnderstandNode._structure_tool_output() and PlannerNode.execute()
+        for the recommended pattern.
 
         Args:
             schema: Pydantic model for structured output
 
         Returns:
-            LLM configured for structured output
+            LLM configured for structured output (WILL FAIL WITH GROQ)
         """
-        # Use function_calling method instead of json_mode for Groq compatibility
-        # This avoids the "tool 'json' not in request.tools" error
+        import warnings
+
+        warnings.warn(
+            "create_structured_llm() is deprecated due to Groq API incompatibility. "
+            "Use manual JSON parsing with explicit format instructions instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.get_llm().with_structured_output(schema)
 
     def _create_llm(self) -> BaseChatModel:

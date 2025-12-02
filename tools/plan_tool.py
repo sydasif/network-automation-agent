@@ -12,7 +12,7 @@ from tools.base_tool import NetworkTool
 class PlanInput(BaseModel):
     """Input schema for planning tasks."""
 
-    request: str = Field(description="The user's request to plan for.")
+    request: str = Field(description="User request to create a plan for")
 
 
 class PlannerTool(NetworkTool):
@@ -32,7 +32,10 @@ class PlannerTool(NetworkTool):
         """Tool description."""
         return (
             "Generate a step-by-step execution plan for complex network automation tasks. "
-            "Use this when a request requires multiple coordinated actions."
+            "Use this when a request requires multiple coordinated actions, such as: "
+            "multi-device configurations, multi-step workflows with verification, "
+            "conditional operations, or complex troubleshooting sequences. "
+            "Do NOT use for simple single-device, single-command operations."
         )
 
     @property

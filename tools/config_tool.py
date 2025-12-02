@@ -46,8 +46,11 @@ class ConfigCommandTool(NetworkTool):
         """Tool description."""
         return (
             "Apply configuration changes to network devices. "
-            "Changes are applied to running-config only. "
-            "Use a separate save command to persist changes to startup-config."
+            "REQUIRES USER APPROVAL: User must approve before execution. "
+            "Use for: interface configurations, routing protocols (OSPF/BGP/EIGRP), "
+            "ACLs, VLANs, system settings. "
+            "REQUIREMENT: Commands MUST match device platform syntax (IOS/EOS/JunOS). "
+            "Changes apply to running-config only - use separate save command to persist to startup-config."
         )
 
     @property

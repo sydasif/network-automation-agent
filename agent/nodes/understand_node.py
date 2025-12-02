@@ -33,15 +33,54 @@ Device inventory:
 
 Role: Understand user requests and translate them into network operations or provide normal chat responses.
 
-Tools:
-- `show_command`: read-only (show/get/display)
-- `config_command`: configuration changes (config/set/delete)
-- `respond`: Final response to the user. Call this ONLY when all tasks are done.
+CRITICAL RULES - NEVER VIOLATE:
+1. Device Names: ONLY use devices from the inventory above. NEVER make up or hallucinate device names.
+2. No Fabrication: NEVER invent command outputs or network state. Wait for actual tool execution results.
+3. Platform Awareness: Match command syntax to device platform (IOS, EOS, JunOS, etc.).
+4. Tool Selection: Choose ONE tool per response based on user intent.
 
-Rules:
-- Call tools only for explicit network operations; do not call for greetings or general chat.
-- Match syntax to each platform. If a command fails, include the device error. Confirm successful config changes.
-- Multi-device: detect target devices, produce device-specific commands per platform (IOS, EOS, JunOS, etc.).
+Available Tools:
+- `show_command`: Execute read-only commands (show/get/display) on network devices.
+  Use for: viewing configurations, checking status, displaying information.
+
+- `config_command`: Apply configuration changes to network devices.
+  Use for: modifying configs, setting parameters, creating/deleting resources.
+  Note: Requires user approval before execution.
+
+- `plan_task`: Break down complex requests into step-by-step execution plans.
+  Use for: multi-device operations, multi-step workflows, conditional logic, complex automation.
+
+- `respond`: Send final response to the user.
+  Use ONLY for: informational queries, greetings, or after ALL network tasks are complete.
+
+Decision Tree - When to use each tool:
+- Simple single-device read operation → `show_command`
+  Example: "show ip route on sw1" → show_command
+
+- Simple single-device configuration → `config_command`
+  Example: "set interface description on sw1" → config_command
+
+- Complex multi-step or multi-device task → `plan_task`
+  Examples:
+  * "configure OSPF on all routers and verify neighbors"
+  * "backup configs from all devices and compare with yesterday"
+  * "check interface status, if down then restart"
+
+- Informational query with no network action → `respond`
+  Examples:
+  * "what devices are available?"
+  * "hello"
+  * "explain what OSPF does"
+
+Multi-Device Operations:
+- When targeting multiple devices, ensure commands are platform-specific
+- Use device platform information from inventory to generate correct syntax
+- For heterogeneous environments, adapt commands per platform
+
+VALIDATION - Before calling any tool:
+- Verify ALL device names exist in the inventory above
+- Ensure commands are non-empty and syntactically valid
+- Confirm tool selection matches the user's intent
 """
 
 
@@ -225,12 +264,29 @@ class UnderstandNode(AgentNode):
         """
         import json
 
-        structured_system_msg = SystemMessage(content=STRUCTURED_OUTPUT_PROMPT)
+        # Get only the last ToolMessage (the actual output we need to structure)
+        last_tool_msg = None
+        for msg in reversed(messages):
+            if isinstance(msg, ToolMessage):
+                last_tool_msg = msg
+                break
+
+        if not last_tool_msg:
+            return {"messages": [AIMessage(content="No tool output to structure")]}
+
+        # Create a focused prompt that only asks to structure THIS specific output
+        structured_system_msg = SystemMessage(
+            content=STRUCTURED_OUTPUT_PROMPT
+            + f"\n\nTool output to structure:\n{last_tool_msg.content}"
+        )
 
         try:
-            # Use plain LLM and parse JSON manually to avoid Groq API issues
+            # Use plain LLM (NOT with tools) to avoid unwanted tool calls
             llm = self._get_llm()
-            response = llm.invoke([structured_system_msg] + messages)
+
+            # Only pass the system message - do NOT include message history
+            # This prevents the LLM from trying to continue the conversation
+            response = llm.invoke([structured_system_msg])
 
             # Parse the JSON response
             response_text = response.content
@@ -263,8 +319,7 @@ class UnderstandNode(AgentNode):
         except Exception as struct_error:
             logger.error(f"Structured output error: {struct_error}")
             # Fallback: return raw tool message content
-            last_msg = messages[-1] if messages else None
-            content = last_msg.content if last_msg else "No tool output"
+            content = last_tool_msg.content if last_tool_msg else "No tool output"
             return {
                 "messages": [
                     AIMessage(
@@ -292,7 +347,69 @@ class UnderstandNode(AgentNode):
         llm_with_tools = self._get_llm_with_tools(self._tools)
         response = llm_with_tools.invoke([system_msg] + messages)
 
-        return {"messages": [response]}
+        # Validate tool calls before returning
+        validated_response = self._validate_tool_calls(response)
+
+        return {"messages": [validated_response]}
+
+    def _validate_tool_calls(self, response: AIMessage) -> AIMessage:
+        """Validate tool calls for device names and command validity.
+
+        Args:
+            response: AIMessage from LLM with potential tool calls
+
+        Returns:
+            Original response if valid, or new AIMessage with error if invalid
+        """
+        # If no tool calls, return as-is
+        if not hasattr(response, "tool_calls") or not response.tool_calls:
+            return response
+
+        # Check each tool call for validation
+        for tool_call in response.tool_calls:
+            tool_name = tool_call.get("name", "")
+            tool_args = tool_call.get("args", {})
+
+            # Validate device names for network operation tools
+            if tool_name in ["show_command", "config_command"]:
+                devices = tool_args.get("devices", [])
+
+                if not devices:
+                    return AIMessage(
+                        content="⚠️ Error: No devices specified for network operation. "
+                        "Please specify target devices from the inventory."
+                    )
+
+                # Validate devices exist in inventory
+                valid, invalid = self._device_inventory.validate_devices(devices)
+
+                if invalid:
+                    available = self._device_inventory.get_all_device_names()
+                    return AIMessage(
+                        content=f"⚠️ Error: Unknown devices: {', '.join(sorted(invalid))}.\n"
+                        f"Available devices: {', '.join(available)}\n\n"
+                        "Please use only devices from the inventory above."
+                    )
+
+                # Validate command/configs are non-empty
+                if tool_name == "show_command":
+                    command = tool_args.get("command", "").strip()
+                    if not command:
+                        return AIMessage(
+                            content="⚠️ Error: Command cannot be empty. "
+                            "Please provide a valid show command."
+                        )
+
+                elif tool_name == "config_command":
+                    configs = tool_args.get("configs", [])
+                    if not configs or all(not c.strip() for c in configs):
+                        return AIMessage(
+                            content="⚠️ Error: Configuration commands cannot be empty. "
+                            "Please provide valid configuration commands."
+                        )
+
+        # All validations passed
+        return response
 
     def _handle_llm_error(self, error: Exception) -> dict[str, Any]:
         """Handle LLM errors with user-friendly messages.
