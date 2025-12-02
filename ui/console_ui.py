@@ -106,6 +106,14 @@ class NetworkAgentUI:
         # 2. Print based on type
         if isinstance(data_to_print, dict) and "structured_data" in data_to_print:
             self._print_structured_data(data_to_print)
+        elif (
+            isinstance(data_to_print, dict)
+            and "message" in data_to_print
+            and len(data_to_print) == 1
+        ):
+            # Simple conversational response - display as plain text
+            self.console.print(Markdown(data_to_print["message"]))
+            self.console.print()
         elif isinstance(data_to_print, (dict, list)):
             self.console.print_json(data=data_to_print)
         else:
