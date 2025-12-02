@@ -6,7 +6,6 @@ the interface for all network automation tools.
 
 from abc import ABC, abstractmethod
 
-from langchain_core.tools import tool
 from pydantic import BaseModel
 
 
@@ -65,14 +64,11 @@ class NetworkTool(ABC):
         Returns:
             LangChain tool compatible with LLM binding
         """
+        from langchain_core.tools import StructuredTool
 
-        # Create a wrapper function that calls our implementation
-        @tool(args_schema=self.args_schema)
-        def tool_fn(**kwargs) -> str:
-            return self._execute_impl(**kwargs)
-
-        # Set tool metadata
-        tool_fn.name = self.name
-        tool_fn.description = self.description
-
-        return tool_fn
+        return StructuredTool.from_function(
+            func=self._execute_impl,
+            name=self.name,
+            description=self.description,
+            args_schema=self.args_schema,
+        )
