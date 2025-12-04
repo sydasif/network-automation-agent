@@ -70,8 +70,8 @@ class NetworkAgentUI:
 
     def print_header(self):
         """Print the application header with session information."""
-        header_text = Text(f"{Emoji.ROCKET} Network AI Agent", style="bold blue")
-        header_text.append(f"\n\n{Emoji.NETWORK} Network Automation with AI", style="italic")
+        header_text = Text(f"{Emoji.ROCKET} AI Agent", style="bold blue")
+        header_text.append(f"\n{Emoji.NETWORK} Network Automation with AI", style="italic")
 
         self.console.print(
             Panel(
@@ -249,16 +249,16 @@ class ColoredLogHandler(logging.Handler):
             # Color and emoji mapping based on log level
             if record.levelno >= logging.ERROR:
                 style = "bold red"
-                level_prefix = f"{Emoji.ERROR} ERROR"
+                level_prefix = f"{Emoji.ERROR}  ERROR"
             elif record.levelno >= logging.WARNING:
                 style = "bold yellow"
-                level_prefix = f"{Emoji.WARNING} WARN"
+                level_prefix = f"{Emoji.WARNING}  WARN"
             elif record.levelno >= logging.INFO:
                 style = "cyan"
-                level_prefix = f"{Emoji.INFO} INFO"
+                level_prefix = f"{Emoji.INFO}  INFO"
             else:
                 style = "dim"
-                level_prefix = f"{Emoji.DEBUG} DEBUG"
+                level_prefix = f"{Emoji.DEBUG}  DEBUG"
 
             # Skip very verbose logs from third-party libraries that clutter the UI
             from core.config import NetworkAgentConfig
