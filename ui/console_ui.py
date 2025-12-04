@@ -46,6 +46,7 @@ class Emoji:
 
     # User interaction
     USER = "👤"
+    AI = "🤖"
     WAVE = "👋"
     QUESTION = "❓"
     APPROVAL = "🔐"
@@ -149,7 +150,9 @@ class NetworkAgentUI:
             and len(data_to_print) == 1
         ):
             # Simple conversational response - display as plain text
-            self.console.print(Markdown(data_to_print["message"]))
+            ai_response = Text(f"{Emoji.AI} AI > ", style="magenta")
+            ai_response.append(data_to_print["message"])
+            self.console.print(ai_response)
             self.console.print()
         elif isinstance(data_to_print, (dict, list)):
             self.console.print_json(data=data_to_print)
