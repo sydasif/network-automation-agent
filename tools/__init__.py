@@ -7,9 +7,11 @@ Tools can be added/removed by creating new tool classes and registering them her
 from core.task_executor import TaskExecutor
 from tools.base_tool import NetworkTool
 from tools.config_tool import ConfigCommandTool
+from tools.format_tool import FormatOutputTool
 from tools.multi_command import MultiCommandTool
 from tools.response_tool import ResponseTool
 from tools.show_tool import ShowCommandTool
+from tools.verify_tool import VerifyChangesTool
 
 
 def get_all_tools(task_executor: TaskExecutor) -> list:
@@ -31,10 +33,23 @@ def get_all_tools(task_executor: TaskExecutor) -> list:
         ConfigCommandTool(task_executor),
         MultiCommandTool(),
         ResponseTool(),
+        VerifyChangesTool(task_executor),
     ]
 
     # Convert to LangChain tool format
     return [tool.to_langchain_tool() for tool in tools]
+
+
+def get_format_tool() -> FormatOutputTool:
+    """Get the format_output tool separately.
+
+    This tool is used by FormatNode and should not be available
+    to the main agent routing.
+
+    Returns:
+        FormatOutputTool instance
+    """
+    return FormatOutputTool()
 
 
 __all__ = [
@@ -43,5 +58,8 @@ __all__ = [
     "ConfigCommandTool",
     "MultiCommandTool",
     "ResponseTool",
+    "FormatOutputTool",
+    "VerifyChangesTool",
     "get_all_tools",
+    "get_format_tool",
 ]

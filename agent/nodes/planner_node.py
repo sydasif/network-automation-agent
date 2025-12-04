@@ -4,7 +4,9 @@ This module provides the PlannerNode class that breaks down
 complex network automation requests into step-by-step plans.
 """
 
+import json
 import logging
+import re
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -31,9 +33,6 @@ class PlannerNode(AgentNode):
         Returns:
             Updated state with plan as AI message
         """
-        import json
-        import re
-
         messages = state.get("messages", [])
         if not messages:
             return state
@@ -47,7 +46,7 @@ class PlannerNode(AgentNode):
             # Fallback: use the last message content
             user_request = str(last_msg.content)
 
-        # Generate plan using plain LLM (not structured output due to Groq API issues)
+        # Generate plan using plain LLM (not structured output for Groq compatibility)
         llm = self._get_llm()
         prompt = NetworkAgentPrompts.planner_system(user_request)
 

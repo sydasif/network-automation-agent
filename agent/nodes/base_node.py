@@ -60,29 +60,10 @@ class AgentNode(ABC):
     def _get_structured_llm(self, schema):
         """Get LLM with structured output.
 
-        **DEPRECATED - Groq API Incompatibility**:
-        This method uses `with_structured_output()` which causes errors with Groq API:
-        "Tool choice is required, but model did not call a tool"
-
-        **Use manual JSON parsing instead**. See UnderstandNode and PlannerNode
-        for the recommended pattern:
-        1. Add JSON format instruction to prompt
-        2. Use plain LLM (not structured output)
-        3. Parse response with json.loads() and fallback regex
-        4. Validate against Pydantic schema manually
-
         Args:
             schema: Pydantic model for structured output
 
         Returns:
-            LLM configured for structured output (WILL FAIL WITH GROQ)
+            LLM configured for structured output
         """
-        import warnings
-
-        warnings.warn(
-            "_get_structured_llm() is deprecated due to Groq API incompatibility. "
-            "Use manual JSON parsing instead (see UnderstandNode/PlannerNode).",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         return self._llm_provider.create_structured_llm(schema)

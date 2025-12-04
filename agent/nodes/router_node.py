@@ -1,8 +1,7 @@
-"""Understand node for processing user input and structuring tool output.
+"""Router node for processing user input.
 
-This module provides the UnderstandNode class that handles two key scenarios:
-1. Processing user requests and routing to appropriate tools
-2. Structuring tool outputs into human-readable responses
+This module provides the RouterNode class that handles user input routing
+to appropriate tools with validation.
 """
 
 import logging
@@ -12,7 +11,6 @@ from langchain_core.messages import (
     AIMessage,
     HumanMessage,
     SystemMessage,
-    ToolMessage,
     trim_messages,
 )
 from langchain_core.messages.utils import count_tokens_approximately
@@ -40,12 +38,10 @@ class NetworkResponse(BaseModel):
     )
 
 
-class UnderstandNode(AgentNode):
-    """Process user messages and structure tool outputs.
+class RouterNode(AgentNode):
+    """Process user input and route to appropriate tools.
 
-    This node has two main responsibilities:
-    1. User Input: Routes to appropriate tools based on user requests
-    2. Tool Output: Structures responses for human-readable display
+    This node handles user message processing, tool routing, and validation.
     """
 
     def __init__(
@@ -69,7 +65,7 @@ class UnderstandNode(AgentNode):
         self._max_history_tokens = max_history_tokens
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Process user input or structure tool outputs.
+        """Process user input and route to tools.
 
         Args:
             state: Current workflow state
@@ -83,15 +79,8 @@ class UnderstandNode(AgentNode):
         trimmed_msgs = self._trim_messages(messages)
 
         try:
-            # Check if processing tool output or user input
-            last_msg = messages[-1] if messages else None
-
-            if isinstance(last_msg, ToolMessage):
-                # Structure tool output
-                return self._structure_tool_output(trimmed_msgs)
-            else:
-                # Process user input and route to tools
-                return self._process_user_input(trimmed_msgs)
+            # Process user input and route to tools
+            return self._process_user_input(trimmed_msgs)
 
         except Exception as e:
             logger.error(f"LLM Error: {e}")
@@ -166,80 +155,6 @@ class UnderstandNode(AgentNode):
 
         response = llm.invoke(prompt)
         return response.content
-
-    def _structure_tool_output(self, messages: list) -> dict[str, Any]:
-        """Structure tool output into NetworkResponse format.
-
-        Args:
-            messages: Trimmed message list with tool output
-
-        Returns:
-            State dict with structured response
-        """
-        import json
-
-        # Get only the last ToolMessage (the actual output we need to structure)
-        last_tool_msg = None
-        for msg in reversed(messages):
-            if isinstance(msg, ToolMessage):
-                last_tool_msg = msg
-                break
-
-        if not last_tool_msg:
-            return {"messages": [AIMessage(content="No tool output to structure")]}
-
-        # Create a focused prompt that only asks to structure THIS specific output
-        structured_system_msg = SystemMessage(
-            content=NetworkAgentPrompts.structured_output_system(last_tool_msg.content)
-        )
-
-        try:
-            # Use plain LLM (NOT with tools) to avoid unwanted tool calls
-            llm = self._get_llm()
-
-            # Only pass the system message - do NOT include message history
-            # This prevents the LLM from trying to continue the conversation
-            response = llm.invoke([structured_system_msg])
-
-            # Parse the JSON response
-            response_text = response.content
-
-            # Try to extract JSON from the response
-            try:
-                # First try: parse whole response as JSON
-                parsed = json.loads(response_text)
-            except json.JSONDecodeError:
-                # Second try: find JSON in markdown code blocks
-                import re
-
-                json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
-                if json_match:
-                    parsed = json.loads(json_match.group(1))
-                else:
-                    # Third try: find JSON object in text
-                    json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-                    if json_match:
-                        parsed = json.loads(json_match.group(0))
-                    else:
-                        raise ValueError("No JSON found in response")
-
-            # Validate against NetworkResponse schema
-            network_response = NetworkResponse(**parsed)
-
-            # Convert to JSON string for AIMessage
-            return {"messages": [AIMessage(content=network_response.model_dump_json())]}
-
-        except Exception as struct_error:
-            logger.error(f"Structured output error: {struct_error}")
-            # Fallback: return raw tool message content
-            content = last_tool_msg.content if last_tool_msg else "No tool output"
-            return {
-                "messages": [
-                    AIMessage(
-                        content=f"Tool output received but could not be structured: {content}"
-                    )
-                ]
-            }
 
     def _process_user_input(self, messages: list) -> dict[str, Any]:
         """Process user input and route to appropriate tools.

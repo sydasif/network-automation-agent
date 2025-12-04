@@ -5,17 +5,18 @@ nodes, state management, and workflow orchestration.
 """
 
 from agent.nodes import (
-    AgentNode,
     ApprovalNode,
     ExecuteNode,
+    FormatNode,
     PlannerNode,
-    UnderstandNode,
+    RouterNode,
 )
 from agent.state import (
     NODE_APPROVAL,
     NODE_EXECUTE,
+    NODE_FORMAT,
     NODE_PLANNER,
-    NODE_UNDERSTAND,
+    NODE_ROUTER,
     RESUME_APPROVED,
     RESUME_DENIED,
     State,
@@ -24,18 +25,19 @@ from agent.workflow_manager import NetworkAgentWorkflow
 
 __all__ = [
     # Nodes
-    "AgentNode",
-    "UnderstandNode",
+    "RouterNode",
     "ApprovalNode",
     "PlannerNode",
     "ExecuteNode",
+    "FormatNode",
     # State
     "State",
     # Constants
-    "NODE_UNDERSTAND",
+    "NODE_ROUTER",
     "NODE_APPROVAL",
     "NODE_PLANNER",
     "NODE_EXECUTE",
+    "NODE_FORMAT",
     "RESUME_APPROVED",
     "RESUME_DENIED",
     # Workflow

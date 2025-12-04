@@ -13,19 +13,22 @@ from langgraph.types import StateSnapshot
 from agent.nodes import (
     ApprovalNode,
     ExecuteNode,
+    FormatNode,
     PlannerNode,
-    UnderstandNode,
+    RouterNode,
 )
 from agent.state import (
     NODE_APPROVAL,
     NODE_EXECUTE,
+    NODE_FORMAT,
     NODE_PLANNER,
-    NODE_UNDERSTAND,
+    NODE_ROUTER,
     State,
 )
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 from core.task_executor import TaskExecutor
+from tools import get_format_tool
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +74,7 @@ class NetworkAgentWorkflow:
             return self._graph
 
         # Create node instances
-        understand_node = UnderstandNode(
+        router_node = RouterNode(
             self._llm_provider,
             self._device_inventory,
             self._tools,
@@ -80,22 +83,24 @@ class NetworkAgentWorkflow:
         approval_node = ApprovalNode(self._llm_provider)
         planner_node = PlannerNode(self._llm_provider)
         execute_node = ExecuteNode(self._llm_provider, self._tools)
+        format_node = FormatNode(self._llm_provider, get_format_tool())
 
         # Create the state graph
         workflow = StateGraph(State)
 
         # Add nodes to the workflow
-        workflow.add_node(NODE_UNDERSTAND, understand_node.execute)
+        workflow.add_node(NODE_ROUTER, router_node.execute)
         workflow.add_node(NODE_APPROVAL, approval_node.execute)
         workflow.add_node(NODE_PLANNER, planner_node.execute)
         workflow.add_node(NODE_EXECUTE, execute_node.execute)
+        workflow.add_node(NODE_FORMAT, format_node.execute)
 
         # Set the starting node
-        workflow.set_entry_point(NODE_UNDERSTAND)
+        workflow.set_entry_point(NODE_ROUTER)
 
-        # Add conditional routing from Understand node
+        # Add conditional routing from Router node
         workflow.add_conditional_edges(
-            NODE_UNDERSTAND,
+            NODE_ROUTER,
             self._route_tools,
             {
                 NODE_EXECUTE: NODE_EXECUTE,
@@ -111,13 +116,14 @@ class NetworkAgentWorkflow:
             self._route_approval,
             {
                 NODE_EXECUTE: NODE_EXECUTE,
-                NODE_UNDERSTAND: NODE_UNDERSTAND,
+                NODE_ROUTER: NODE_ROUTER,
             },
         )
 
-        # Execution and planning output go back to Understand for formatting
-        workflow.add_edge(NODE_EXECUTE, NODE_UNDERSTAND)
-        workflow.add_edge(NODE_PLANNER, NODE_UNDERSTAND)
+        # Execution and planning output go to Format node
+        workflow.add_edge(NODE_EXECUTE, NODE_FORMAT)
+        workflow.add_edge(NODE_PLANNER, NODE_FORMAT)
+        workflow.add_edge(NODE_FORMAT, END)
 
         # Compile the workflow with memory saver
         self._graph = workflow.compile(checkpointer=MemorySaver())
@@ -168,7 +174,7 @@ class NetworkAgentWorkflow:
 
         # If ToolMessage present, user denied the action
         if isinstance(last_message, ToolMessage):
-            return NODE_UNDERSTAND
+            return NODE_ROUTER
 
         # Otherwise, proceed to execute
         return NODE_EXECUTE
