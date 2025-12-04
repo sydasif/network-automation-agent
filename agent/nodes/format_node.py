@@ -10,6 +10,7 @@ from typing import Any
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 
 from agent.nodes.base_node import AgentNode
+from agent.prompts import NetworkAgentPrompts
 from core.llm_provider import LLMProvider
 
 logger = logging.getLogger(__name__)
@@ -56,21 +57,9 @@ class FormatNode(AgentNode):
         if not last_tool_msg:
             return {"messages": [AIMessage(content="No tool output to format")]}
 
-        # Create system prompt for formatting
+        # Create system prompt for formatting using centralized prompt
         system_msg = SystemMessage(
-            content=f"""You are a network automation assistant analyzing command output.
-
-Your task is to structure the following tool output into a clear, organized response.
-
-Tool output to analyze:
-{last_tool_msg.content}
-
-Call the format_output tool with:
-- summary: A human-readable executive summary highlighting operational status, health, and anomalies. Use Markdown.
-- structured_data: The parsed data as a dictionary or list
-- errors: List of any errors (or null if none)
-
-CRITICAL: You MUST call the format_output tool. Do NOT return plain text."""
+            content=NetworkAgentPrompts.format_system(last_tool_msg.content)
         )
 
         try:

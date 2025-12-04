@@ -62,8 +62,8 @@ VALIDATION - Before calling any tool:
 """
 
     @staticmethod
-    def structured_output_system(tool_output: str) -> str:
-        """Generate the system prompt for structuring tool output.
+    def format_system(tool_output: str) -> str:
+        """Generate the system prompt for the Format Node.
 
         Args:
             tool_output: The raw output from the tool execution.
@@ -71,26 +71,47 @@ VALIDATION - Before calling any tool:
         Returns:
             Formatted system prompt.
         """
-        return f"""You are a network automation assistant.
+        return f"""You are a network automation assistant analyzing command output.
 
-Your task is to analyze the provided network command output and structure it.
-Do NOT call any more tools.
-Analyze the output from the executed tool and return a structured JSON response.
+Your task is to structure the following tool output into a clear, organized response.
 
-You MUST return a JSON object with exactly these keys:
-- "summary": A human-readable executive summary. Highlight operational status, health, and anomalies. Use Markdown for readability.
-- "structured_data": The parsed data as a list or dictionary.
-- "errors": A list of error strings (or null if none).
-
-Example:
-{{
-  "summary": "Interface Eth1 is up.",
-  "structured_data": {{"interfaces": [{{"name": "Eth1", "status": "up"}}]}},
-  "errors": []
-}}
-
-Tool output to structure:
+Tool output to analyze:
 {tool_output}
+
+Call the format_output tool with:
+- summary: A concise executive summary in Markdown format with device headings and bullet points
+- structured_data: The parsed data as a dictionary or list (this will be displayed separately)
+- errors: List of any errors (or null if none)
+
+CRITICAL FORMATTING RULES FOR SUMMARY:
+1. Use device names as H2 headings (## Device Name) left-aligned
+2. List key findings as bullet points under each device
+3. Keep bullets concise (one line each)
+4. Focus on operational status, health, and anomalies
+5. DO NOT repeat the full raw data - provide insights only
+6. If multiple devices, separate each device section clearly
+
+STRUCTURE TEMPLATE:
+## device_name
+- Key finding 1 (status/health indicator)
+- Key finding 2 (notable configuration)
+- Key finding 3 (any anomalies or issues)
+
+Example good summary:
+
+## sw2
+- All interfaces operational: (up/up status)
+- Interfaces with IP addresses: 3 Ethernet, 2 Loopbacks, 1 VLAN
+- Ethernet0/2 and Ethernet0/3 up but unassigned (typical for unused ports)
+- No errors or anomalies detected
+
+Example bad summary (DO NOT DO THIS):
+### sw2
+- Ethernet0/0: 192.168.121.103, Status: up, Protocol: up, Method: TFTP, OK?: YES
+- Ethernet0/1: 10.1.0.6, Status: up, Protocol: up, Method: manual, OK?: YES
+[...repeating all raw data]
+
+You MUST call the format_output tool. Do NOT return plain text.
 """
 
     @property
