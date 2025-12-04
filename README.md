@@ -64,17 +64,20 @@ The application follows a **modular, class-based architecture** with clear separ
 **Agent Workflow:**
 
 - `NetworkAgentWorkflow` - Workflow orchestration
-- `UnderstandNode` - Input processing & output structuring
+- `RouterNode` - Input processing & tool routing
 - `ApprovalNode` - Human-in-the-loop approval
 - `ExecuteNode` - Tool execution
 - `PlannerNode` - Complex task planning
+- `FormatNode` - Structured output formatting
 
 **Tools:**
 
 - `ShowCommandTool` - Read-only show commands
 - `ConfigCommandTool` - Configuration changes
-- `PlannerTool` - Task planning
+- `MultiCommandTool` - Task planning
 - `ResponseTool` - Final responses
+- `FormatOutputTool` - Structured output formatting
+- `VerifyChangesTool` - Configuration verification
 
 ## 🚀 Quick Start
 
@@ -227,10 +230,11 @@ network-automation-agent/
 │   ├── state.py
 │   └── nodes/
 │       ├── base_node.py
-│       ├── understand_node.py
+│       ├── router_node.py
 │       ├── approval_node.py
 │       ├── planner_node.py
-│       └── execute_node.py
+│       ├── execute_node.py
+│       └── format_node.py
 ├── cli/                    # CLI application
 │   ├── application.py
 │   └── command_processor.py
@@ -333,10 +337,11 @@ tools = get_all_tools(task_executor)  # All tools loaded dynamically
 
 The agent uses LangGraph for workflow orchestration:
 
-1. **Understand** - Process input or structure output
+1. **Router** - Process input and route to tools
 2. **Approval** - Request human approval for config changes
 3. **Execute** - Run the tools
 4. **Plan** - Break down complex tasks
+5. **Format** - Structure tool outputs into JSON/Markdown
 
 ## 🤝 Contributing
 
