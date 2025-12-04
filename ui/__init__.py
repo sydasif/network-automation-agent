@@ -6,9 +6,10 @@ This package provides UI components:
 - Themes and styling
 """
 
-from ui.console_ui import NetworkAgentUI, setup_colored_logging
+from ui.console_ui import Emoji, NetworkAgentUI, setup_colored_logging
 
 __all__ = [
+    "Emoji",
     "NetworkAgentUI",
     "setup_colored_logging",
 ]
