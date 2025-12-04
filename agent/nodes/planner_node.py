@@ -10,27 +10,9 @@ from typing import Any
 from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.nodes.base_node import AgentNode
+from agent.prompts import NetworkAgentPrompts
 
 logger = logging.getLogger(__name__)
-
-
-PLANNER_PROMPT = """
-You are a network automation planner.
-Your job is to break down complex user requests into a series of logical steps.
-
-User Request: {user_request}
-
-CRITICAL RULES:
-- Reference ONLY devices from the user's network inventory (do NOT make up device names)
-- Match commands to device platforms (IOS, EOS, JunOS, etc.)
-- Each step must be specific, actionable, and executable
-- Do NOT make assumptions about current network state
-- Break down complex operations into simple, verifiable steps
-
-Return a list of steps to accomplish this task.
-Each step should be a clear, actionable description with specific device names and commands.
-Do not generate actual code or full configurations yet, just the high-level plan.
-"""
 
 
 class PlannerNode(AgentNode):
@@ -67,7 +49,7 @@ class PlannerNode(AgentNode):
 
         # Generate plan using plain LLM (not structured output due to Groq API issues)
         llm = self._get_llm()
-        prompt = PLANNER_PROMPT.format(user_request=user_request)
+        prompt = NetworkAgentPrompts.planner_system(user_request)
 
         # Add JSON format instruction
         json_instruction = (
