@@ -145,7 +145,7 @@ class NetworkAgentWorkflow:
         # Route based on tool name
         if tool_name == "config_command":
             return NODE_APPROVAL
-        elif tool_name == "plan_task":
+        elif tool_name == "multi_command":
             return NODE_PLANNER
         elif tool_name == "respond":
             return END

@@ -5,11 +5,12 @@ class NetworkAgentPrompts:
     """Collection of prompts for the Network Automation Agent."""
 
     @staticmethod
-    def understand_system(device_inventory: str) -> str:
+    def understand_system(device_inventory: str, tools_description: str) -> str:
         """Generate the system prompt for the Understand Node.
 
         Args:
             device_inventory: String representation of the device inventory.
+            tools_description: String representation of available tools.
 
         Returns:
             Formatted system prompt.
@@ -28,18 +29,7 @@ CRITICAL RULES - NEVER VIOLATE:
 4. Tool Selection: Choose ONE tool per response based on user intent.
 
 Available Tools:
-- `show_command`: Execute read-only commands (show/get/display) on network devices.
-  Use for: viewing configurations, checking status, displaying information.
-
-- `config_command`: Apply configuration changes to network devices.
-  Use for: modifying configs, setting parameters, creating/deleting resources.
-  Note: Requires user approval before execution.
-
-- `plan_task`: Break down complex requests into step-by-step execution plans.
-  Use for: multi-device operations, multi-step workflows, conditional logic, complex automation.
-
-- `respond`: Send final response to the user.
-  Use ONLY for: informational queries, greetings, or after ALL network tasks are complete.
+{tools_description}
 
 Decision Tree - When to use each tool:
 - Simple single-device read operation → `show_command`
@@ -48,7 +38,7 @@ Decision Tree - When to use each tool:
 - Simple single-device configuration → `config_command`
   Example: "set interface description on sw1" → config_command
 
-- Complex multi-step or multi-device task → `plan_task`
+- Complex multi-step or multi-device task → `multi_command`
   Examples:
   * "configure OSPF on all routers and verify neighbors"
   * "backup configs from all devices and compare with yesterday"

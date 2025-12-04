@@ -1,6 +1,6 @@
-"""Planning tool for complex network automation tasks.
+"""Multi-command tool for complex network automation tasks.
 
-This module provides the PlannerTool class for breaking down
+This module provides the MultiCommandTool class for breaking down
 complex requests into step-by-step execution plans.
 """
 
@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 from tools.base_tool import NetworkTool
 
 
-class PlanInput(BaseModel):
-    """Input schema for planning tasks."""
+class MultiCommandInput(BaseModel):
+    """Input schema for multi-command tasks."""
 
     request: str = Field(description="User request to create a plan for")
 
 
-class PlannerTool(NetworkTool):
+class MultiCommandTool(NetworkTool):
     """Generate step-by-step execution plans for complex requests.
 
     This tool analyzes complex network automation requests and breaks
@@ -25,7 +25,7 @@ class PlannerTool(NetworkTool):
     @property
     def name(self) -> str:
         """Tool name."""
-        return "plan_task"
+        return "multi_command"
 
     @property
     def description(self) -> str:
@@ -41,7 +41,7 @@ class PlannerTool(NetworkTool):
     @property
     def args_schema(self) -> type[BaseModel]:
         """Arguments schema."""
-        return PlanInput
+        return MultiCommandInput
 
     def _execute_impl(self, request: str) -> str:
         """Generate execution plan for the request.

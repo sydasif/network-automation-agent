@@ -252,7 +252,10 @@ class UnderstandNode(AgentNode):
         """
         # Get device inventory for prompt
         inventory_str = self._device_inventory.get_device_info()
-        system_msg = SystemMessage(content=NetworkAgentPrompts.understand_system(inventory_str))
+        tools_desc = self._format_tools_description(self._tools)
+        system_msg = SystemMessage(
+            content=NetworkAgentPrompts.understand_system(inventory_str, tools_desc)
+        )
 
         # Get LLM with tools and invoke
         llm_with_tools = self._get_llm_with_tools(self._tools)
@@ -341,3 +344,21 @@ class UnderstandNode(AgentNode):
             msg = "⚠️ An internal error occurred processing your request."
 
         return {"messages": [AIMessage(content=msg)]}
+
+    def _format_tools_description(self, tools: list) -> str:
+        """Format tool descriptions for the prompt.
+
+        Args:
+            tools: List of tool instances
+
+        Returns:
+            Formatted string of tool descriptions
+        """
+        descriptions = []
+        for tool in tools:
+            # Handle both LangChain tools and our custom tools
+            name = getattr(tool, "name", str(tool))
+            description = getattr(tool, "description", "")
+            descriptions.append(f"- `{name}`: {description}")
+
+        return "\n\n".join(descriptions)
