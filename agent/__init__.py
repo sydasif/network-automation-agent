@@ -9,7 +9,6 @@ from agent.nodes import (
     ExecuteNode,
     FormatNode,
     PlannerNode,
-    RouterNode,
     ContextManagerNode,
     UnderstandingNode,
     ValidationNode,
@@ -19,7 +18,6 @@ from agent.state import (
     NODE_EXECUTE,
     NODE_FORMAT,
     NODE_PLANNER,
-    NODE_ROUTER,
     NODE_CONTEXT_MANAGER,
     NODE_UNDERSTANDING,
     NODE_VALIDATION,
@@ -31,7 +29,6 @@ from agent.workflow_manager import NetworkAgentWorkflow
 
 __all__ = [
     # Nodes
-    "RouterNode",
     "ApprovalNode",
     "PlannerNode",
     "ExecuteNode",
@@ -42,7 +39,6 @@ __all__ = [
     # State
     "State",
     # Constants
-    "NODE_ROUTER",
     "NODE_CONTEXT_MANAGER",
     "NODE_UNDERSTANDING",
     "NODE_VALIDATION",

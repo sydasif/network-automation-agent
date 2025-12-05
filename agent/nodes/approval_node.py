@@ -1,8 +1,4 @@
-"""Approval node for human-in-the-loop config changes.
-
-This module provides the ApprovalNode class that requests user
-approval before applying configuration changes.
-"""
+"""Approval node for human-in-the-loop config changes."""
 
 import logging
 from typing import Any
@@ -17,47 +13,47 @@ logger = logging.getLogger(__name__)
 
 
 class ApprovalNode(AgentNode):
-    """Request user approval for configuration changes.
-
-    This node interrupts workflow execution and waits for user
-    decision before proceeding with configuration changes.
-    """
+    """Request user approval for configuration changes."""
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any] | None:
-        """Request approval from user for config changes.
-
-        Args:
-            state: Current workflow state
-
-        Returns:
-            None if approved, or state with denial message if rejected
-        """
+        """Request approval from user for config changes."""
         messages = state.get("messages", [])
         if not messages:
             return None
 
         last_msg = messages[-1]
 
-        # Check if there are tool calls to approve
+        # Check for tool calls
         if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
             return None
 
-        tool_call = last_msg.tool_calls[0]
+        # Identify sensitive calls (config_command)
+        sensitive_calls = [
+            tc for tc in last_msg.tool_calls
+            if tc["name"] == "config_command"
+        ]
 
-        # Interrupt workflow and wait for user decision
-        decision = interrupt({"type": "approval_request", "tool_call": tool_call})
-
-        if decision == RESUME_APPROVED:
-            logger.info(f"User approved: {tool_call['name']}")
+        if not sensitive_calls:
             return None
 
-        # User denied the configuration change
-        logger.info(f"User denied: {tool_call['name']}")
-        return {
-            "messages": [
-                ToolMessage(
-                    tool_call_id=tool_call["id"],
-                    content=f"❌ User denied permission: {tool_call['name']}",
-                )
-            ],
-        }
+        # Interrupt workflow and wait for user decision on the BATCH of calls
+        decision = interrupt({
+            "type": "approval_request",
+            "tool_calls": sensitive_calls
+        })
+
+        if decision == RESUME_APPROVED:
+            logger.info(f"User approved batch of {len(sensitive_calls)} calls")
+            return None
+
+        # User denied - generate denial messages for ALL calls to maintain state consistency
+        logger.info("User denied configuration batch")
+        denial_messages = [
+            ToolMessage(
+                tool_call_id=tc["id"],
+                content=f"❌ User denied permission for operation: {tc['name']}"
+            )
+            for tc in sensitive_calls
+        ]
+
+        return {"messages": denial_messages}

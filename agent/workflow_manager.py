@@ -211,15 +211,16 @@ class NetworkAgentWorkflow:
         return {"configurable": {"thread_id": f"session-{session_id}"}}
 
     def get_approval_request(self, snapshot: StateSnapshot) -> dict | None:
-        """Extract approval request from a state snapshot.
-
-        Args:
-            snapshot: Workflow state snapshot
-
-        Returns:
-            Tool call dict if there's an approval request, None otherwise
-        """
+        """Extract approval request from a state snapshot."""
         if not snapshot.tasks or not snapshot.tasks[0].interrupts:
             return None
 
-        return snapshot.tasks[0].interrupts[0].value.get("tool_call")
+        interrupt_value = snapshot.tasks[0].interrupts[0].value
+
+        # Backwards compatibility if needed, but we expect "tool_calls" list now
+        if "tool_calls" in interrupt_value:
+            return {"tool_calls": interrupt_value["tool_calls"]}
+        elif "tool_call" in interrupt_value:
+             return {"tool_calls": [interrupt_value["tool_call"]]}
+
+        return None

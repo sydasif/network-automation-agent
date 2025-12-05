@@ -1,8 +1,4 @@
-"""Execute node for running tools.
-
-This module provides the ExecuteNode class that wraps LangGraph's
-ToolNode for executing network automation tools.
-"""
+"""Execute node for running tools."""
 
 from typing import Any
 
@@ -13,30 +9,14 @@ from core.llm_provider import LLMProvider
 
 
 class ExecuteNode(AgentNode):
-    """Execute node for running network automation tools.
-
-    This node wraps LangGraph's ToolNode to execute the tools
-    that were called by the understand node.
-    """
+    """Execute node for running network automation tools."""
 
     def __init__(self, llm_provider: LLMProvider, tools: list):
-        """Initialize the execute node.
-
-        Args:
-            llm_provider: LLMProvider instance
-            tools: List of tools to make available for execution
-        """
         super().__init__(llm_provider)
-        self._tool_node = ToolNode(tools)
+        # Enable built-in error handling
+        self._tool_node = ToolNode(tools, handle_tool_errors=True)
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Execute the tools from the last message.
-
-        Args:
-            state: Current workflow state
-
-        Returns:
-            Updated state with tool execution results
-        """
+        """Execute the tools from the last message."""
         # Delegate to LangGraph's ToolNode
         return self._tool_node.invoke(state)

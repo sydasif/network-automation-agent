@@ -4,12 +4,13 @@ This module provides the ShowCommandTool class for executing
 read-only show commands on network devices.
 """
 
+from langchain_core.tools import ToolException
 from nornir_netmiko.tasks import netmiko_send_command
 from pydantic import BaseModel, Field
 
 from core.task_executor import TaskExecutor
 from tools.base_tool import NetworkTool
-from utils.responses import error, process_nornir_result
+from utils.responses import process_nornir_result
 
 
 class ShowCommandInput(BaseModel):
@@ -68,9 +69,9 @@ class ShowCommandTool(NetworkTool):
         """
         # Validate inputs
         if not devices:
-            return error("No devices specified.")
+            raise ToolException("No devices specified. Please select from inventory.")
         if not command.strip():
-            return error("Command cannot be empty.")
+            raise ToolException("Command cannot be empty.")
 
         # Execute via task executor
         results = self._task_executor.execute_task(

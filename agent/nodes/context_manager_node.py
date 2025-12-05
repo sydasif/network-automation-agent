@@ -1,8 +1,4 @@
-"""Context manager node for conversation history management.
-
-This module provides the ContextManagerNode class that handles
-conversation history trimming and context window management.
-"""
+"""Context manager node for conversation history management."""
 
 import logging
 from typing import Any
@@ -18,35 +14,18 @@ logger = logging.getLogger(__name__)
 
 
 class ContextManagerNode(AgentNode):
-    """Manages conversation history and context window.
-
-    This node handles message trimming to fit within context windows
-    and maintains conversation continuity.
-    """
+    """Manages conversation history and context window."""
 
     def __init__(
         self,
         llm_provider: LLMProvider,
         max_history_tokens: int = 3500,
     ):
-        """Initialize the context manager node.
-
-        Args:
-            llm_provider: LLMProvider instance
-            max_history_tokens: Maximum tokens for conversation history
-        """
         super().__init__(llm_provider)
         self._max_history_tokens = max_history_tokens
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Manage conversation history and context window.
-
-        Args:
-            state: Current workflow state
-
-        Returns:
-            Updated state with trimmed messages
-        """
+        """Manage conversation history and context window."""
         messages = state.get("messages", [])
 
         # Trim messages to fit within context window
@@ -55,14 +34,7 @@ class ContextManagerNode(AgentNode):
         return {"messages": trimmed_msgs}
 
     def _trim_messages(self, messages: list) -> list:
-        """Trim messages to fit within context window.
-
-        Args:
-            messages: List of messages
-
-        Returns:
-            Trimmed list of messages
-        """
+        """Trim messages to fit within context window."""
         try:
             trimmed_msgs = trim_messages(
                 messages,
@@ -107,20 +79,20 @@ class ContextManagerNode(AgentNode):
             return messages[-10:] if len(messages) > 10 else messages
 
     def _summarize_messages(self, messages: list) -> str:
-        """Summarize messages using LLM.
-
-        Args:
-            messages: List of messages to summarize
-
-        Returns:
-            Summary string
-        """
+        """Summarize messages using LLM."""
         llm = self._get_llm()
-        prompt = f"{NetworkAgentPrompts.summary_system}\n\nMessages:\n"
+
+        # Prepare content string for the template
+        content_parts = []
         for msg in messages:
             role = "User" if hasattr(msg, "role") and msg.role != "assistant" else "User"
             if hasattr(msg, "content"):
-                prompt += f"{role}: {msg.content}\n"
+                content_parts.append(f"{role}: {msg.content}")
+
+        # Use ChatPromptTemplate
+        prompt = NetworkAgentPrompts.SUMMARY_PROMPT.invoke(
+            {"messages_content": "\n".join(content_parts)}
+        )
 
         response = llm.invoke(prompt)
         return response.content

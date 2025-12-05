@@ -64,7 +64,9 @@ The application follows a **modular, class-based architecture** with clear separ
 **Agent Workflow:**
 
 - `NetworkAgentWorkflow` - Workflow orchestration
-- `RouterNode` - Input processing & tool routing
+- `ContextManagerNode` - Conversation history management
+- `UnderstandingNode` - Input processing & tool selection
+- `ValidationNode` - Input validation and device verification
 - `ApprovalNode` - Human-in-the-loop approval
 - `ExecuteNode` - Tool execution
 - `PlannerNode` - Complex task planning
@@ -230,7 +232,9 @@ network-automation-agent/
 │   ├── state.py
 │   └── nodes/
 │       ├── base_node.py
-│       ├── router_node.py
+│       ├── context_manager_node.py
+│       ├── understanding_node.py
+│       ├── validation_node.py
 │       ├── approval_node.py
 │       ├── planner_node.py
 │       ├── execute_node.py
@@ -337,11 +341,13 @@ tools = get_all_tools(task_executor)  # All tools loaded dynamically
 
 The agent uses LangGraph for workflow orchestration:
 
-1. **Router** - Process input and route to tools
-2. **Approval** - Request human approval for config changes
-3. **Execute** - Run the tools
-4. **Plan** - Break down complex tasks
-5. **Format** - Structure tool outputs into JSON/Markdown
+1. **Context Manager** - Manage conversation history and context window
+2. **Understanding** - Process input and select appropriate tools
+3. **Validation** - Validate tool calls and device names
+4. **Approval** - Request human approval for config changes
+5. **Execute** - Run the tools
+6. **Plan** - Break down complex tasks
+7. **Format** - Structure tool outputs into JSON/Markdown
 
 ## 🤝 Contributing
 

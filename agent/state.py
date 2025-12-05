@@ -20,7 +20,6 @@ class State(TypedDict):
 
 
 # Node name constants for workflow graph
-NODE_ROUTER = "router"
 NODE_PLANNER = "planner"
 NODE_APPROVAL = "approval"
 NODE_EXECUTE = "execute"

@@ -1,15 +1,10 @@
-"""Planner node for complex task breakdown.
+"""Planner node for complex task breakdown."""
 
-This module provides the PlannerNode class that breaks down
-complex network automation requests into step-by-step plans.
-"""
-
-import json
 import logging
-import re
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
+from utils.llm_helpers import parse_json_from_llm_response
 
 from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
@@ -18,79 +13,47 @@ logger = logging.getLogger(__name__)
 
 
 class PlannerNode(AgentNode):
-    """Generate step-by-step plans for complex requests.
-
-    This node analyzes complex network automation requests and
-    breaks them down into logical, sequential steps.
-    """
+    """Generate step-by-step plans for complex requests."""
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Generate execution plan for the request.
-
-        Args:
-            state: Current workflow state
-
-        Returns:
-            Updated state with plan as AI message
-        """
+        """Generate execution plan for the request."""
         messages = state.get("messages", [])
         if not messages:
             return state
 
         last_msg = messages[-1]
+        user_request = (
+            last_msg.content if isinstance(last_msg, HumanMessage) else str(last_msg.content)
+        )
 
-        # Extract user request content
-        if isinstance(last_msg, HumanMessage):
-            user_request = last_msg.content
-        else:
-            # Fallback: use the last message content
-            user_request = str(last_msg.content)
-
-        # Generate plan using plain LLM (not structured output for Groq compatibility)
+        # Generate plan using ChatPromptTemplate
         llm = self._get_llm()
-        prompt = NetworkAgentPrompts.planner_system(user_request)
+        prompt = NetworkAgentPrompts.PLANNER_PROMPT.invoke({"user_request": user_request})
 
-        # Add JSON format instruction
+        # Add manual JSON instruction since we aren't using bind_tools here
         json_instruction = (
             "\n\nReturn your response as a JSON object with this exact format:\n"
             '{"steps": ["step 1 description", "step 2 description", ...]}'
         )
-        full_prompt = prompt + json_instruction
+
+        # Combine prompt messages with instruction
+        final_messages = prompt.to_messages()
+        final_messages[-1].content += json_instruction
 
         try:
-            response = llm.invoke(full_prompt)
-            response_text = response.content
+            response = llm.invoke(final_messages)
 
-            # Try to extract JSON from the response
-            try:
-                # First try: parse whole response as JSON
-                parsed = json.loads(response_text)
-            except json.JSONDecodeError:
-                # Second try: find JSON in markdown code blocks
-                json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
-                if json_match:
-                    parsed = json.loads(json_match.group(1))
-                else:
-                    # Third try: find JSON object in text
-                    json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-                    if json_match:
-                        parsed = json.loads(json_match.group(0))
-                    else:
-                        raise ValueError("No JSON found in response")
+            # Use shared utility for robust JSON parsing
+            parsed = parse_json_from_llm_response(response.content)
 
-            # Validate and extract steps
             if "steps" in parsed and isinstance(parsed["steps"], list):
                 steps = parsed["steps"]
             else:
                 raise ValueError("Invalid plan format - missing 'steps' array")
 
-            # Format plan as a numbered list
             plan_str = "I have created a plan:\n" + "\n".join(
                 [f"{i + 1}. {step}" for i, step in enumerate(steps)]
             )
-
-            logger.info(f"Generated plan with {len(steps)} steps")
-
             return {"messages": [AIMessage(content=plan_str)]}
 
         except Exception as e:

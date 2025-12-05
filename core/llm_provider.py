@@ -96,7 +96,8 @@ class LLMProvider:
 
         return ChatGroq(
             model=self._config.llm_model_name,
-            temperature=self._config.llm_temperature,
+            # Increased temperature to 0.2 to encourage parallel tool calling
+            temperature=max(self._config.llm_temperature, 0.2),
             groq_api_key=self._config.groq_api_key,
         )
 

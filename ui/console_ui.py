@@ -116,9 +116,14 @@ class NetworkAgentUI:
 
     def _print_structured_data(self, data: dict):
         """Helper to print structured network response."""
-        self.console.print(f"[bold cyan]{Emoji.DATA} Structured Data:[/bold cyan]")
-        self.console.print_json(data=data.get("structured_data"))
+        structured_data = data.get("structured_data")
 
+        # Only print structured data if it is not empty (None, {}, or [])
+        if structured_data:
+            self.console.print(f"[bold cyan]{Emoji.DATA} Structured Data:[/bold cyan]")
+            self.console.print_json(data=structured_data)
+
+        # Always print the summary
         self.console.print(f"\n[bold green]{Emoji.RESULT} Summary:[/bold green]")
         self.console.print(Markdown(data.get("summary", "")))
         self.console.print()
@@ -183,12 +188,23 @@ class NetworkAgentUI:
         """Display warning messages with appropriate styling."""
         self.console.print(f"[bold yellow]{Emoji.WARNING}  Warning:[/bold yellow] {warning_msg}")
 
-    def print_approval_request(self, action: str, args: dict):
-        """Display approval request with clear visual indication."""
+    def print_approval_request(self, tool_calls: list[dict]):
+        """Display approval request for multiple tool calls."""
+        content = Text()
+
+        for i, call in enumerate(tool_calls, 1):
+            action = call.get("name")
+            args = call.get("args")
+
+            content.append(f"\n{Emoji.GEAR} Action {i}: {action}\n", style="bold cyan")
+            content.append(f"{Emoji.DATA} Args: {json.dumps(args, indent=2)}\n", style="yellow")
+            if i < len(tool_calls):
+                content.append("-" * 40 + "\n", style="dim")
+
         self.console.print(
             Panel(
-                f"[bold]{Emoji.GEAR} Action:[/bold] {action}\n[bold]{Emoji.DATA} Args:[/bold] {args}",
-                title=f"[bold red]{Emoji.APPROVAL} CONFIGURATION CHANGE DETECTED {Emoji.APPROVAL}[/bold red]",
+                content,
+                title=f"[bold red]{Emoji.APPROVAL} CONFIGURATION CHANGE DETECTED ({len(tool_calls)} Operations) {Emoji.APPROVAL}[/bold red]",
                 border_style="red",
                 expand=False,
             )

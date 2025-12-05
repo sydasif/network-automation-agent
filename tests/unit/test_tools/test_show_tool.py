@@ -43,14 +43,14 @@ def test_show_tool_execution(mock_task_executor):
 
 
 def test_show_tool_execution_no_devices(mock_task_executor):
-    """Test execution without specifying devices (should return error)."""
+    """Test execution without specifying devices (should raise ToolException)."""
     tool = ShowCommandTool(mock_task_executor)
 
-    # Should return error JSON string
-    result = tool._run(devices=[], command="show version")
+    # Should raise ToolException
+    with pytest.raises(Exception) as exc_info:
+        tool._run(devices=[], command="show version")
 
-    assert "error" in result
-    assert "No devices specified" in result
+    assert "No devices specified" in str(exc_info.value)
 
     # Task executor should NOT be called
     mock_task_executor.execute_task.assert_not_called()

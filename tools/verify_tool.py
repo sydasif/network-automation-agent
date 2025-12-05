@@ -4,12 +4,13 @@ This module provides the VerifyChangesTool class for user-triggered
 verification of network configuration changes.
 """
 
+from langchain_core.tools import ToolException
 from nornir_netmiko.tasks import netmiko_send_command
 from pydantic import BaseModel, Field
 
 from core.task_executor import TaskExecutor
 from tools.base_tool import NetworkTool
-from utils.responses import error, process_nornir_result
+from utils.responses import process_nornir_result
 
 
 class VerifyChangesInput(BaseModel):
@@ -71,9 +72,11 @@ class VerifyChangesTool(NetworkTool):
         """
         # Validate inputs
         if not devices:
-            return error("No devices specified for verification.")
+            raise ToolException(
+                "No devices specified for verification. Please select from inventory."
+            )
         if not check_commands:
-            return error("No verification commands provided.")
+            raise ToolException("No verification commands provided.")
 
         # Run each verification command
         all_results = {}

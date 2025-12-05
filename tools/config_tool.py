@@ -4,12 +4,13 @@ This module provides the ConfigCommandTool class for applying
 configuration changes to network devices.
 """
 
+from langchain_core.tools import ToolException
 from nornir_netmiko.tasks import netmiko_send_config
 from pydantic import BaseModel, Field
 
 from core.task_executor import TaskExecutor
 from tools.base_tool import NetworkTool
-from utils.responses import error, process_nornir_result
+from utils.responses import process_nornir_result
 
 
 class ConfigCommandInput(BaseModel):
@@ -70,12 +71,12 @@ class ConfigCommandTool(NetworkTool):
         """
         # Validate inputs
         if not devices:
-            return error("No devices specified.")
+            raise ToolException("No devices specified. Please select from inventory.")
 
         # Sanitize: split multi-line commands and filter empty lines
         clean_configs = [c.strip() for cmd in configs for c in cmd.split("\n") if c.strip()]
         if not clean_configs:
-            return error("No configuration commands provided.")
+            raise ToolException("No configuration commands provided.")
 
         # Execute via task executor
         results = self._task_executor.execute_task(

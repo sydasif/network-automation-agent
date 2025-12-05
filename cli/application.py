@@ -186,27 +186,23 @@ class NetworkAgentCLI:
         return result
 
     def _handle_approvals(self, config: dict, result: dict) -> dict:
-        """Handle approval requests in the workflow.
-
-        Args:
-            config: Session configuration
-            result: Current workflow result
-
-        Returns:
-            Updated result after handling approvals
-        """
+        """Handle approval requests in the workflow."""
         snapshot = self._graph.get_state(config)
 
-        # Loop to handle multiple approval requests
-        while tool_call := self._workflow.get_approval_request(snapshot):
-            self._ui.print_approval_request(tool_call["name"], tool_call["args"])
-            choice = self._ui.get_approval_decision()
+        # Loop to handle approval requests
+        while approval_data := self._workflow.get_approval_request(snapshot):
+            # Extract tool calls list
+            tool_calls = approval_data.get("tool_calls", [])
 
-            resume_value = RESUME_APPROVED if choice in ["yes", "y"] else RESUME_DENIED
+            if tool_calls:
+                self._ui.print_approval_request(tool_calls)
+                choice = self._ui.get_approval_decision()
 
-            # Resume workflow
-            with self._ui.thinking_status("Resuming workflow..."):
-                result = self._graph.invoke(Command(resume=resume_value), config)
+                resume_value = RESUME_APPROVED if choice in ["yes", "y"] else RESUME_DENIED
+
+                # Resume workflow
+                with self._ui.thinking_status("Resuming workflow..."):
+                    result = self._graph.invoke(Command(resume=resume_value), config)
 
             # Update snapshot
             snapshot = self._graph.get_state(config)
