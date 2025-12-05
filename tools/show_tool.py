@@ -56,7 +56,7 @@ class ShowCommandTool(NetworkTool):
         """Arguments schema."""
         return ShowCommandInput
 
-    def _execute_impl(self, devices: list[str], command: str) -> str:
+    def _run(self, devices: list[str], command: str) -> str:
         """Execute show command on specified devices.
 
         Args:

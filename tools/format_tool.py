@@ -54,7 +54,7 @@ class FormatOutputTool(NetworkTool):
         """Arguments schema."""
         return FormatOutputInput
 
-    def _execute_impl(
+    def _run(
         self, summary: str, structured_data: dict | list, errors: list[str] | None = None
     ) -> str:
         """Format output into structured response.

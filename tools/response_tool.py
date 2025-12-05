@@ -41,7 +41,7 @@ class ResponseTool(NetworkTool):
         """Arguments schema."""
         return ResponseInput
 
-    def _execute_impl(self, message: str) -> str:
+    def _run(self, message: str) -> str:
         """Return the response message.
 
         Args:

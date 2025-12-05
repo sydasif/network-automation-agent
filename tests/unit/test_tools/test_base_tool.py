@@ -31,7 +31,7 @@ class ConcreteTool(NetworkTool):
     def args_schema(self) -> type[BaseModel]:
         return TestInput
 
-    def _execute_impl(self, **kwargs) -> str:
+    def _run(self, **kwargs) -> str:
         return f"Executed with {kwargs}"
 
 

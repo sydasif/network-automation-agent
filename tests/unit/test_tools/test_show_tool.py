@@ -29,7 +29,7 @@ def test_show_tool_execution(mock_task_executor):
     # Mock task executor result
     mock_task_executor.execute_task.return_value = {"R1": "output"}
 
-    result = tool._execute_impl(command="show version", devices=["R1"])
+    result = tool._run(command="show version", devices=["R1"])
 
     # Verify task executor was called correctly
     mock_task_executor.execute_task.assert_called_once()
@@ -47,7 +47,7 @@ def test_show_tool_execution_no_devices(mock_task_executor):
     tool = ShowCommandTool(mock_task_executor)
 
     # Should return error JSON string
-    result = tool._execute_impl(devices=[], command="show version")
+    result = tool._run(devices=[], command="show version")
 
     assert "error" in result
     assert "No devices specified" in result

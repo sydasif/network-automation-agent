@@ -14,8 +14,8 @@ from tools.show_tool import ShowCommandTool
 from tools.verify_tool import VerifyChangesTool
 
 
-def get_all_tools(task_executor: TaskExecutor) -> list:
-    """Get all available network automation tools.
+def create_tools(task_executor: TaskExecutor) -> list:
+    """Create all available network automation tools.
 
     This is the tool registry. To add a new tool:
     1. Create a new tool class inheriting from NetworkTool
@@ -40,8 +40,8 @@ def get_all_tools(task_executor: TaskExecutor) -> list:
     return [tool.to_langchain_tool() for tool in tools]
 
 
-def get_format_tool() -> FormatOutputTool:
-    """Get the format_output tool separately.
+def create_format_tool() -> FormatOutputTool:
+    """Create the format_output tool separately.
 
     This tool is used by FormatNode and should not be available
     to the main agent routing.
@@ -60,6 +60,6 @@ __all__ = [
     "ResponseTool",
     "FormatOutputTool",
     "VerifyChangesTool",
-    "get_all_tools",
-    "get_format_tool",
+    "create_tools",
+    "create_format_tool",
 ]

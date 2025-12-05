@@ -43,7 +43,7 @@ class MultiCommandTool(NetworkTool):
         """Arguments schema."""
         return MultiCommandInput
 
-    def _execute_impl(self, request: str) -> str:
+    def _run(self, request: str) -> str:
         """Generate execution plan for the request.
 
         Args:

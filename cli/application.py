@@ -19,7 +19,7 @@ from core import (
     NornirManager,
     TaskExecutor,
 )
-from tools import get_all_tools
+from tools import create_tools
 from ui import NetworkAgentUI
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class NetworkAgentCLI:
         self._llm_provider = LLMProvider(self._config)
 
         # Tools
-        self._tools = get_all_tools(self._task_executor)
+        self._tools = create_tools(self._task_executor)
         logger.info(f"Loaded {len(self._tools)} tools")
 
         # Workflow

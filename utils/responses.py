@@ -28,7 +28,7 @@ def success(devices: dict, **extra) -> str:
     return json.dumps({"devices": devices, **extra}, indent=2)
 
 
-def passthrough(data: dict) -> str:
+def to_json(data: dict) -> str:
     """Return raw dict as JSON (for Nornir global errors)."""
     return json.dumps(data)
 
@@ -39,5 +39,5 @@ def process_nornir_result(results: dict, **extra) -> str:
     Handles the common pattern of checking for global errors before returning success.
     """
     if "error" in results and len(results) == 1:
-        return passthrough(results)
+        return to_json(results)
     return success(results, **extra)

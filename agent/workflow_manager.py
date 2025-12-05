@@ -28,7 +28,7 @@ from agent.state import (
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 from core.task_executor import TaskExecutor
-from tools import get_format_tool
+from tools import create_format_tool
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class NetworkAgentWorkflow:
         approval_node = ApprovalNode(self._llm_provider)
         planner_node = PlannerNode(self._llm_provider)
         execute_node = ExecuteNode(self._llm_provider, self._tools)
-        format_node = FormatNode(self._llm_provider, get_format_tool())
+        format_node = FormatNode(self._llm_provider, create_format_tool())
 
         # Create the state graph
         workflow = StateGraph(State)

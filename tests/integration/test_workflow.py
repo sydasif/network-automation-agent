@@ -10,7 +10,7 @@ from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 from core.nornir_manager import NornirManager
 from core.task_executor import TaskExecutor
-from tools import get_all_tools
+from tools import create_tools
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_workflow_show_command(mock_infrastructure):
     llm_provider = mock_infrastructure["llm_provider"]
 
     # Setup tools
-    tools = get_all_tools(task_executor)
+    tools = create_tools(task_executor)
 
     # Setup LLM responses
     mock_llm = MagicMock()
@@ -109,7 +109,7 @@ def test_workflow_config_approval(mock_infrastructure):
     task_executor = mock_infrastructure["task_executor"]
     llm_provider = mock_infrastructure["llm_provider"]
 
-    tools = get_all_tools(task_executor)
+    tools = create_tools(task_executor)
 
     mock_llm = MagicMock()
     llm_provider.get_llm.return_value = mock_llm

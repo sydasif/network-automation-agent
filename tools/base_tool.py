@@ -47,7 +47,7 @@ class NetworkTool(ABC):
         pass
 
     @abstractmethod
-    def _execute_impl(self, **kwargs) -> str:
+    def _run(self, **kwargs) -> str:
         """Execute the tool logic (implementation-specific).
 
         Args:
@@ -67,7 +67,7 @@ class NetworkTool(ABC):
         from langchain_core.tools import StructuredTool
 
         return StructuredTool.from_function(
-            func=self._execute_impl,
+            func=self._run,
             name=self.name,
             description=self.description,
             args_schema=self.args_schema,

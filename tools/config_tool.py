@@ -58,7 +58,7 @@ class ConfigCommandTool(NetworkTool):
         """Arguments schema."""
         return ConfigCommandInput
 
-    def _execute_impl(self, devices: list[str], configs: list[str]) -> str:
+    def _run(self, devices: list[str], configs: list[str]) -> str:
         """Apply configuration commands to specified devices.
 
         Args:

@@ -18,7 +18,7 @@ def mock_app():
         patch("cli.application.LLMProvider") as _mock_llm_cls,
         patch("cli.application.NetworkAgentWorkflow") as mock_workflow_cls,
         patch("cli.application.NetworkAgentUI") as mock_ui_cls,
-        patch("cli.application.get_all_tools") as _mock_tools_cls,
+        patch("cli.application.create_tools") as _mock_tools_cls,
     ):
         # Setup minimum required mocks
         mock_config = MagicMock()

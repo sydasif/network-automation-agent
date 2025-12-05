@@ -59,7 +59,7 @@ class VerifyChangesTool(NetworkTool):
         """Arguments schema."""
         return VerifyChangesInput
 
-    def _execute_impl(self, devices: list[str], check_commands: list[str]) -> str:
+    def _run(self, devices: list[str], check_commands: list[str]) -> str:
         """Verify changes on specified devices.
 
         Args:
