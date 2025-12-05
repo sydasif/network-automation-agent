@@ -1,7 +1,7 @@
-"""Workflow manager for the Network AI Agent.
+"""Workflow manager for the Network AI Agent with split router responsibilities.
 
 This module provides the NetworkAgentWorkflow class that manages
-the LangGraph workflow creation and execution.
+the LangGraph workflow creation and execution using split router responsibilities.
 """
 
 import logging
@@ -15,14 +15,18 @@ from agent.nodes import (
     ExecuteNode,
     FormatNode,
     PlannerNode,
-    RouterNode,
+    ContextManagerNode,
+    UnderstandingNode,
+    ValidationNode,
 )
 from agent.state import (
     NODE_APPROVAL,
     NODE_EXECUTE,
     NODE_FORMAT,
     NODE_PLANNER,
-    NODE_ROUTER,
+    NODE_CONTEXT_MANAGER,
+    NODE_UNDERSTANDING,
+    NODE_VALIDATION,
     State,
 )
 from core.device_inventory import DeviceInventory
@@ -34,10 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkAgentWorkflow:
-    """Manages the LangGraph workflow for the network agent.
+    """Manages the LangGraph workflow for the network agent with split router responsibilities.
 
     This class encapsulates workflow creation, configuration,
-    and provides utilities for workflow management.
+    and provides utilities for workflow management using the new
+    context manager → understanding → validation workflow.
     """
 
     def __init__(
@@ -65,7 +70,7 @@ class NetworkAgentWorkflow:
         self._graph = None
 
     def build(self):
-        """Build and compile the workflow graph.
+        """Build and compile the workflow graph with split router responsibilities.
 
         Returns:
             Compiled LangGraph workflow ready to process requests
@@ -73,12 +78,19 @@ class NetworkAgentWorkflow:
         if self._graph is not None:
             return self._graph
 
-        # Create node instances
-        router_node = RouterNode(
+        # Create node instances with split responsibilities
+        context_manager_node = ContextManagerNode(
+            self._llm_provider,
+            self._max_history_tokens,
+        )
+        understanding_node = UnderstandingNode(
             self._llm_provider,
             self._device_inventory,
             self._tools,
-            self._max_history_tokens,
+        )
+        validation_node = ValidationNode(
+            self._llm_provider,
+            self._device_inventory,
         )
         approval_node = ApprovalNode(self._llm_provider)
         planner_node = PlannerNode(self._llm_provider)
@@ -89,19 +101,25 @@ class NetworkAgentWorkflow:
         workflow = StateGraph(State)
 
         # Add nodes to the workflow
-        workflow.add_node(NODE_ROUTER, router_node.execute)
+        workflow.add_node(NODE_CONTEXT_MANAGER, context_manager_node.execute)
+        workflow.add_node(NODE_UNDERSTANDING, understanding_node.execute)
+        workflow.add_node(NODE_VALIDATION, validation_node.execute)
         workflow.add_node(NODE_APPROVAL, approval_node.execute)
         workflow.add_node(NODE_PLANNER, planner_node.execute)
         workflow.add_node(NODE_EXECUTE, execute_node.execute)
         workflow.add_node(NODE_FORMAT, format_node.execute)
 
         # Set the starting node
-        workflow.set_entry_point(NODE_ROUTER)
+        workflow.set_entry_point(NODE_CONTEXT_MANAGER)
 
-        # Add conditional routing from Router node
+        # Define the new workflow: CONTEXT_MANAGER → UNDERSTANDING → VALIDATION → [routing]
+        workflow.add_edge(NODE_CONTEXT_MANAGER, NODE_UNDERSTANDING)
+        workflow.add_edge(NODE_UNDERSTANDING, NODE_VALIDATION)
+
+        # After validation, conditionally route to appropriate nodes
         workflow.add_conditional_edges(
-            NODE_ROUTER,
-            self._route_tools,
+            NODE_VALIDATION,
+            self._route_after_validation,
             {
                 NODE_EXECUTE: NODE_EXECUTE,
                 NODE_APPROVAL: NODE_APPROVAL,
@@ -116,7 +134,7 @@ class NetworkAgentWorkflow:
             self._route_approval,
             {
                 NODE_EXECUTE: NODE_EXECUTE,
-                NODE_ROUTER: NODE_ROUTER,
+                NODE_CONTEXT_MANAGER: NODE_CONTEXT_MANAGER,  # Go back to context manager if rejected
             },
         )
 
@@ -128,11 +146,13 @@ class NetworkAgentWorkflow:
         # Compile the workflow with memory saver
         self._graph = workflow.compile(checkpointer=MemorySaver())
 
-        logger.info("Workflow graph built and compiled successfully")
+        logger.info(
+            "New workflow graph with split router responsibilities built and compiled successfully"
+        )
         return self._graph
 
-    def _route_tools(self, state: State) -> str:
-        """Route based on tool called in the last message.
+    def _route_after_validation(self, state: State) -> str:
+        """Route based on tool called in the last message after validation.
 
         Args:
             state: Current workflow state
@@ -142,7 +162,7 @@ class NetworkAgentWorkflow:
         """
         last_message = state["messages"][-1]
 
-        # If no tool calls, end the workflow
+        # If validation failed or no tool calls, end the workflow
         if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
             return END
 
@@ -174,7 +194,7 @@ class NetworkAgentWorkflow:
 
         # If ToolMessage present, user denied the action
         if isinstance(last_message, ToolMessage):
-            return NODE_ROUTER
+            return NODE_CONTEXT_MANAGER  # Go back to context manager to continue conversation
 
         # Otherwise, proceed to execute
         return NODE_EXECUTE
