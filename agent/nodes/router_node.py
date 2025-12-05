@@ -14,7 +14,6 @@ from langchain_core.messages import (
     trim_messages,
 )
 from langchain_core.messages.utils import count_tokens_approximately
-from pydantic import BaseModel, Field
 
 from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
@@ -22,20 +21,6 @@ from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 
 logger = logging.getLogger(__name__)
-
-
-class NetworkResponse(BaseModel):
-    """Structured response for network operations."""
-
-    summary: str = Field(
-        description="A human-readable summary highlighting operational status and anomalies."
-    )
-    structured_data: dict | list = Field(
-        description="The parsed data from the device output in JSON format (list or dict)."
-    )
-    errors: list[str] | None = Field(
-        description="List of any errors encountered during execution."
-    )
 
 
 class RouterNode(AgentNode):

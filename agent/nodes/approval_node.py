@@ -11,12 +11,9 @@ from langchain_core.messages import ToolMessage
 from langgraph.types import interrupt
 
 from agent.nodes.base_node import AgentNode
+from agent.state import RESUME_APPROVED
 
 logger = logging.getLogger(__name__)
-
-# Node constants
-RESUME_APPROVED = "approved"
-RESUME_DENIED = "denied"
 
 
 class ApprovalNode(AgentNode):

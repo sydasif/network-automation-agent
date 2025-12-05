@@ -8,9 +8,7 @@ This package manages the command-line interface:
 """
 
 from cli.application import NetworkAgentCLI
-from cli.command_processor import CommandProcessor
 
 __all__ = [
     "NetworkAgentCLI",
-    "CommandProcessor",
 ]

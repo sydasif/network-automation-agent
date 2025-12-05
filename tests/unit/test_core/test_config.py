@@ -17,7 +17,7 @@ def test_config_load_defaults():
             config = NetworkAgentConfig()
 
             assert config.groq_api_key == "test_key"
-            assert config.llm_model_name == "openai/gpt-oss-120b"
+            assert config.llm_model_name == "openai/gpt-oss-20b"
             assert config.llm_temperature == 0.0
             assert config.num_workers == 20
             assert config.netmiko_timeout == 30
