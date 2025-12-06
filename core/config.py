@@ -33,7 +33,7 @@ class NetworkAgentConfig:
         self._groq_api_key = os.getenv("GROQ_API_KEY")
         self._llm_model_name = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-20b")
         self._llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.0"))
-        self._max_history_tokens = int(os.getenv("MAX_HISTORY_TOKENS", "3500"))
+        self._max_history_tokens = int(os.getenv("MAX_HISTORY_TOKENS", "2000"))
 
         # Nornir configuration
         self._num_workers = int(os.getenv("NUM_WORKERS", "20"))
