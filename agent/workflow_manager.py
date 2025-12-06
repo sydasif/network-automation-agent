@@ -107,8 +107,16 @@ class NetworkAgentWorkflow:
         return self._graph
 
     def _route_tool_calls(self, state: State) -> str:
+        """Decide next node based on the tool selected by UnderstandingNode."""
         last_message = state["messages"][-1]
 
+        # 1. SAFETY NET: If no tool calls and no content, force a retry
+        if not last_message.tool_calls and not last_message.content.strip():
+            # In a real scenario, we might want to inject a system error,
+            # but for now, we assume the UI handles empty responses or we end.
+            return END
+
+        # 2. If no tool calls but has text, it's a direct response -> END
         if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
             return END
 
