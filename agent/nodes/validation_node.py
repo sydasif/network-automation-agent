@@ -9,6 +9,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage
 
+from agent.constants import TOOL_CONFIG_COMMAND, TOOL_SHOW_COMMAND
 from agent.nodes.base_node import AgentNode
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
@@ -46,14 +47,10 @@ class ValidationNode(AgentNode):
         Returns:
             Updated state with validation result
         """
-        messages = state.get("messages", [])
 
-        if not messages:
-            return state
+        last_msg = self._get_latest_tool_message(state)
 
-        last_msg = messages[-1]
-
-        if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
+        if not last_msg:
             return state
 
         # Validate tool calls
@@ -85,7 +82,7 @@ class ValidationNode(AgentNode):
             tool_args = tool_call.get("args", {})
 
             # Validate device names for network operation tools
-            if tool_name in ["show_command", "config_command"]:
+            if tool_name in [TOOL_SHOW_COMMAND, TOOL_CONFIG_COMMAND]:
                 devices = tool_args.get("devices", [])
 
                 if not devices:
@@ -108,14 +105,14 @@ class ValidationNode(AgentNode):
                     )
 
                 # Validate command/configs are non-empty
-                if tool_name == "show_command":
+                if tool_name == TOOL_SHOW_COMMAND:
                     command = tool_args.get("command", "").strip()
                     if not command:
                         return ValidationResult(
                             False, "Command cannot be empty. Please provide a valid show command."
                         )
 
-                elif tool_name == "config_command":
+                elif tool_name == TOOL_CONFIG_COMMAND:
                     configs = tool_args.get("configs", [])
                     if not configs or all(not c.strip() for c in configs):
                         return ValidationResult(

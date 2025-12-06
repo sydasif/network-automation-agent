@@ -58,7 +58,6 @@ class NetworkAgentCLI:
 
         # Tools
         self._tools = create_tools(self._task_executor)
-        logger.info(f"Loaded {len(self._tools)} tools")
 
         # Workflow
         self._workflow = NetworkAgentWorkflow(
@@ -69,7 +68,6 @@ class NetworkAgentCLI:
             max_history_tokens=self._config.max_history_tokens,
         )
         self._graph = self._workflow.build()
-        logger.info("Workflow graph built successfully")
 
         # UI
         self._ui = NetworkAgentUI()

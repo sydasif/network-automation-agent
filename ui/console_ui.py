@@ -6,13 +6,16 @@ between logging, input, and output using color coding and visual boundaries.
 
 import json
 import logging
+import re
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
 from rich.console import Console
+from rich.json import JSON
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.text import Text
+from rich.theme import Theme
 
 
 # Emoji constants for consistent usage throughout the UI
@@ -46,7 +49,7 @@ class Emoji:
 
     # User interaction
     USER = "👤"
-    AI = "🤖"
+    AI = "🔷"
     WAVE = "👋"
     QUESTION = "❓"
     APPROVAL = "🔐"
@@ -56,7 +59,18 @@ class NetworkAgentUI:
     """Enhanced UI for the Network AI Agent with color separation."""
 
     def __init__(self):
-        self.console = Console()
+        # Define custom theme for distinct JSON highlighting
+        custom_theme = Theme(
+            {
+                "json.str": "orange1",
+                "json.number": "orange1",
+                "json.bool": "orange1",
+                "json.null": "orange1",
+                "json.key": "bold cyan",
+                "markdown.strong": "bold cyan",
+            }
+        )
+        self.console = Console(theme=custom_theme)
         self.log_handler = None
         # Create a style for the prompt
         self.style = Style.from_dict(
@@ -114,22 +128,31 @@ class NetworkAgentUI:
         except KeyboardInterrupt:
             return ""
 
+    def _style_summary_keys(self, text: str) -> str:
+        """Enhance markdown summary by bolding keys in list items."""
+        # Regex looks for lines starting with - or * followed by text and a colon
+        # It wraps the key part in ** to apply the strong style (bold cyan)
+        # Pattern captures: 1. bullet+space, 2. key text (non-greedy), 3. colon
+        pattern = r"(?m)^(\s*[-*]\s+)([^:\n*]+)(:)"
+        return re.sub(pattern, r"\1**\2**\3", text)
+
     def _print_structured_data(self, data: dict):
         """Helper to print structured network response."""
         structured_data = data.get("structured_data")
 
         # Only print structured data if it is not empty (None, {}, or [])
         if structured_data:
-            self.console.print(f"[bold cyan]{Emoji.DATA} Structured Data:[/bold cyan]")
-            self.console.print_json(data=structured_data)
+            self.console.print(f"[bold magenta]{Emoji.DATA} Structured Data:[/bold magenta]")
+            self.console.print(JSON.from_data(structured_data))
 
         # Always print the summary
-        self.console.print(f"\n[bold green]{Emoji.RESULT} Summary:[/bold green]")
-        self.console.print(Markdown(data.get("summary", "")))
+        self.console.print(f"\n[bold magenta]{Emoji.RESULT} Summary:[/bold magenta]")
+        summary_text = self._style_summary_keys(data.get("summary", ""))
+        self.console.print(Markdown(summary_text), style="orange1")
         self.console.print()
 
         if data.get("errors"):
-            self.console.print(f"\n[bold red]Errors:[/bold red] {data['errors']}")
+            self.console.print(f"\n[bold red]{Emoji.ERROR} Errors:[/bold red] {data['errors']}")
 
     def print_output(self, content: str | dict):
         """Display the command output with clear separation."""
@@ -142,6 +165,7 @@ class NetworkAgentUI:
                 data_to_print = json.loads(content)
             except json.JSONDecodeError:
                 # Not JSON, treat as Markdown string
+                self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue]")
                 self.console.print(Markdown(content))
                 self.console.print()  # Empty line
                 return
@@ -154,16 +178,17 @@ class NetworkAgentUI:
             and "message" in data_to_print
             and len(data_to_print) == 1
         ):
-            # Simple conversational response - display as plain text
-            ai_response = Text(f"{Emoji.AI} AI > ", style="magenta")
-            ai_response.append(data_to_print["message"])
-            self.console.print(ai_response)
+            # Simple conversational response - display as text with prefix
+            # Make sure we don't double print if the message is short
+            self.console.print(
+                f"[bold blue]{Emoji.AI} AI >[/bold blue] {data_to_print['message']}"
+            )
             self.console.print()
         elif isinstance(data_to_print, (dict, list)):
             self.console.print_json(data=data_to_print)
         else:
             # Fallback for non-json string or other types
-            self.console.print(content)
+            self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue] {content}")
 
         # Add empty line for spacing
         self.console.print()
@@ -273,7 +298,7 @@ class ColoredLogHandler(logging.Handler):
                 style = "bold yellow"
                 level_prefix = f"{Emoji.WARNING}  WARN"
             elif record.levelno >= logging.INFO:
-                style = "cyan"
+                style = "dim green"
                 level_prefix = f"{Emoji.INFO}  INFO"
             else:
                 style = "dim"
@@ -292,7 +317,7 @@ class ColoredLogHandler(logging.Handler):
             if record.levelno >= logging.ERROR and "failed with traceback" in message:
                 message = message.splitlines()[0]
 
-            self.console.print(f"[{style}]│ {level_prefix}: {message} │[/]", style=style)
+            self.console.print(f"[{style}]{level_prefix}: {message}[/]", style=style)
 
         except Exception:
             self.handleError(record)

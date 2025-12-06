@@ -6,6 +6,7 @@ from typing import Any
 from langchain_core.messages import ToolMessage
 from langgraph.types import interrupt
 
+from agent.constants import TOOL_CONFIG_COMMAND
 from agent.nodes.base_node import AgentNode
 from agent.state import RESUME_APPROVED
 
@@ -17,18 +18,12 @@ class ApprovalNode(AgentNode):
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any] | None:
         """Request approval from user for config changes."""
-        messages = state.get("messages", [])
-        if not messages:
-            return None
-
-        last_msg = messages[-1]
-
-        # Check for tool calls
-        if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
+        last_msg = self._get_latest_tool_message(state)
+        if not last_msg:
             return None
 
         # Identify sensitive calls (config_command)
-        sensitive_calls = [tc for tc in last_msg.tool_calls if tc["name"] == "config_command"]
+        sensitive_calls = [tc for tc in last_msg.tool_calls if tc["name"] == TOOL_CONFIG_COMMAND]
 
         if not sensitive_calls:
             return None

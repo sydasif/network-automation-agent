@@ -7,6 +7,8 @@ the interface for all workflow nodes.
 from abc import ABC, abstractmethod
 from typing import Any
 
+from langchain_core.messages import AIMessage
+
 from core.llm_provider import LLMProvider
 
 
@@ -67,3 +69,24 @@ class AgentNode(ABC):
             LLM configured for structured output
         """
         return self._llm_provider.create_structured_llm(schema)
+
+    def _get_latest_tool_message(self, state: dict[str, Any]) -> AIMessage | None:
+        """Get the latest message if it has tool calls.
+
+        Args:
+            state: Current workflow state
+
+        Returns:
+            The latest AIMessage if it has tool calls, else None
+        """
+        messages = state.get("messages", [])
+        if not messages:
+            return None
+
+        last_msg = messages[-1]
+
+        # Check for tool calls
+        if not hasattr(last_msg, "tool_calls") or not last_msg.tool_calls:
+            return None
+
+        return last_msg

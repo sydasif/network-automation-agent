@@ -10,6 +10,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import StateSnapshot
 
+from agent.constants import TOOL_CONFIG_COMMAND, TOOL_MULTI_COMMAND, TOOL_RESPOND
 from agent.nodes import (
     ApprovalNode,
     ContextManagerNode,
@@ -152,9 +153,6 @@ class NetworkAgentWorkflow:
         # Compile the workflow with memory saver
         self._graph = workflow.compile(checkpointer=MemorySaver())
 
-        logger.info(
-            "New workflow graph with split router responsibilities built and compiled successfully"
-        )
         return self._graph
 
     def _route_after_validation(self, state: State) -> str:
@@ -175,11 +173,11 @@ class NetworkAgentWorkflow:
         tool_name = last_message.tool_calls[0]["name"]
 
         # Route based on tool name
-        if tool_name == "config_command":
+        if tool_name == TOOL_CONFIG_COMMAND:
             return NODE_APPROVAL
-        elif tool_name == "multi_command":
+        elif tool_name == TOOL_MULTI_COMMAND:
             return NODE_PLANNER
-        elif tool_name == "respond":
+        elif tool_name == TOOL_RESPOND:
             return END
         else:
             # For show_command and other tools, execute directly
