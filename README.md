@@ -79,7 +79,6 @@ The application follows a **modular, class-based architecture** with clear separ
 - `MultiCommandTool` - Task planning
 - `ResponseTool` - Final responses
 - `FormatOutputTool` - Structured output formatting
-- `VerifyChangesTool` - Configuration verification
 
 ## 🚀 Quick Start
 

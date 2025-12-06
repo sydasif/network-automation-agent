@@ -5,6 +5,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 from utils.llm_helpers import parse_json_from_llm_response
+
 # Import middleware for sanitization
 from utils.memory import sanitize_messages
 
@@ -26,7 +27,7 @@ class PlannerNode(AgentNode):
         # --- APPLY MEMORY MIDDLEWARE ---
         safe_messages = sanitize_messages(
             messages,
-            max_tokens=1000  # Planner needs less context usually
+            max_tokens=1000,  # Planner needs less context usually
         )
         # -------------------------------
 

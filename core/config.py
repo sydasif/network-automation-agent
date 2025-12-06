@@ -32,7 +32,7 @@ class NetworkAgentConfig:
         # Load configuration values
         self._groq_api_key = os.getenv("GROQ_API_KEY")
         self._llm_model_name = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-120b")
-        self._llm_model_secondary = os.getenv("LLM_MODEL_SECONDARY", "llama-3.3-70b-versatile")
+        self._llm_model_secondary = os.getenv("LLM_MODEL_SECONDARY", "openai/gpt-oss-20b")
         self._llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.7"))
         self._max_history_tokens = int(os.getenv("MAX_HISTORY_TOKENS", "1500"))
 

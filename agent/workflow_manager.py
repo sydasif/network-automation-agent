@@ -2,7 +2,6 @@
 
 import logging
 import sqlite3
-from pathlib import Path
 
 # CHANGED: Import SqliteSaver
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -63,7 +62,9 @@ class NetworkAgentWorkflow:
             return self._graph
 
         context_manager_node = ContextManagerNode(self._llm_provider, self._max_history_tokens)
-        understanding_node = UnderstandingNode(self._llm_provider, self._device_inventory, self._tools)
+        understanding_node = UnderstandingNode(
+            self._llm_provider, self._device_inventory, self._tools
+        )
         validation_node = ValidationNode(self._llm_provider, self._device_inventory)
         approval_node = ApprovalNode(self._llm_provider)
         planner_node = PlannerNode(self._llm_provider)
@@ -107,7 +108,8 @@ class NetworkAgentWorkflow:
 
         workflow.add_edge(NODE_EXECUTE, NODE_FORMAT)
         workflow.add_edge(NODE_PLANNER, NODE_FORMAT)
-        workflow.add_edge(NODE_FORMAT, END)
+        # Loop back to Context Manager to allow multi-step autonomy
+        workflow.add_edge(NODE_FORMAT, NODE_CONTEXT_MANAGER)
 
         # CHANGED: Initialize SQLite Checkpointer
         logger.info(f"Initializing persistence at {self._db_path}")
@@ -135,6 +137,7 @@ class NetworkAgentWorkflow:
 
     def _route_approval(self, state: State) -> str:
         from langchain_core.messages import ToolMessage
+
         last_message = state["messages"][-1]
         if isinstance(last_message, ToolMessage):
             return NODE_CONTEXT_MANAGER

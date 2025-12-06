@@ -11,7 +11,6 @@ from tools.format_tool import FormatOutputTool
 from tools.multi_command import MultiCommandTool
 from tools.response_tool import ResponseTool
 from tools.show_tool import ShowCommandTool
-from tools.verify_tool import VerifyChangesTool
 
 
 def create_tools(task_executor: TaskExecutor) -> list:
@@ -33,7 +32,6 @@ def create_tools(task_executor: TaskExecutor) -> list:
         ConfigCommandTool(task_executor),
         MultiCommandTool(),
         ResponseTool(),
-        VerifyChangesTool(task_executor),
     ]
 
     # Convert to LangChain tool format
@@ -59,7 +57,6 @@ __all__ = [
     "MultiCommandTool",
     "ResponseTool",
     "FormatOutputTool",
-    "VerifyChangesTool",
     "create_tools",
     "create_format_tool",
 ]

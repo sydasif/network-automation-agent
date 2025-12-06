@@ -7,6 +7,7 @@ from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
+
 # Import the new middleware
 from utils.memory import sanitize_messages
 
@@ -35,10 +36,7 @@ class UnderstandingNode(AgentNode):
         # --- APPLY MEMORY MIDDLEWARE ---
         # We sanitize LOCALLY. This ensures the prompt is safe,
         # but we don't mess up the global state (add_messages) logic.
-        safe_messages = sanitize_messages(
-            messages,
-            max_tokens=self._max_tokens
-        )
+        safe_messages = sanitize_messages(messages, max_tokens=self._max_tokens)
         # -------------------------------
 
         # Get device inventory
@@ -48,7 +46,7 @@ class UnderstandingNode(AgentNode):
         prompt = NetworkAgentPrompts.UNDERSTAND_PROMPT.invoke(
             {
                 "device_inventory": inventory_str,
-                "messages": safe_messages, # Pass safe messages, not raw state
+                "messages": safe_messages,  # Pass safe messages, not raw state
             }
         )
 

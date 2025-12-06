@@ -41,7 +41,9 @@ class FormatNode(AgentNode):
 
         try:
             # Bind format_output tool to secondary LLM (better for formatting tasks)
-            llm_with_tool = self._get_secondary_llm_with_tools([self._format_tool.to_langchain_tool()])
+            llm_with_tool = self._get_secondary_llm_with_tools(
+                [self._format_tool.to_langchain_tool()]
+            )
 
             # Invoke LLM with the formatted prompt
             response = llm_with_tool.invoke(prompt)

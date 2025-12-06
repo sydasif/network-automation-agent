@@ -5,7 +5,6 @@ from typing import List
 
 from langchain_core.messages import (
     BaseMessage,
-    SystemMessage,
     ToolMessage,
     trim_messages,
 )
@@ -13,10 +12,9 @@ from langchain_core.messages.utils import count_tokens_approximately
 
 logger = logging.getLogger(__name__)
 
+
 def sanitize_messages(
-    messages: List[BaseMessage],
-    max_tokens: int = 1500,
-    max_tool_output_length: int = 800
+    messages: List[BaseMessage], max_tokens: int = 1500, max_tool_output_length: int = 800
 ) -> List[BaseMessage]:
     """
     Sanitize messages before sending to LLM to prevent 413/Rate Limit errors.
@@ -62,7 +60,7 @@ def sanitize_messages(
                     ),
                     name=msg.name,
                     status=msg.status,
-                    artifact=msg.artifact
+                    artifact=msg.artifact,
                 )
                 optimized_messages.append(compressed_msg)
             else:
@@ -84,15 +82,17 @@ def sanitize_messages(
             max_tokens=max_tokens,
             strategy="last",
             token_counter=count_tokens_approximately,
-            include_system=False, # System prompts are added by the Node templates later
+            include_system=False,  # System prompts are added by the Node templates later
             allow_partial=False,
-            start_on="human"
+            start_on="human",
         )
 
         # Log if we cut things out
         if len(final_messages) < len(optimized_messages):
             diff = len(optimized_messages) - len(final_messages)
-            logger.debug(f"Memory Middleware: Trimmed {diff} messages to fit {max_tokens} token limit.")
+            logger.debug(
+                f"Memory Middleware: Trimmed {diff} messages to fit {max_tokens} token limit."
+            )
 
         return final_messages
 
