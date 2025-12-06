@@ -99,6 +99,7 @@ class LLMProvider:
             # Increased temperature to 0.2 to encourage parallel tool calling
             temperature=max(temperature, 0.2) if temperature > 0 else 0,
             groq_api_key=self._config.groq_api_key,
+            max_retries=3,
         )
 
     def check_safe_to_send(self, messages: list) -> bool:

@@ -7,6 +7,8 @@ from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
+# Import the new middleware
+from utils.memory import sanitize_messages
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +25,21 @@ class UnderstandingNode(AgentNode):
         super().__init__(llm_provider)
         self._device_inventory = device_inventory
         self._tools = tools
+        # Get limit from config via provider's config (or you can inject config directly)
+        self._max_tokens = llm_provider._config.max_history_tokens
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any]:
         """Understand user intent and select tools."""
         messages = state.get("messages", [])
+
+        # --- APPLY MEMORY MIDDLEWARE ---
+        # We sanitize LOCALLY. This ensures the prompt is safe,
+        # but we don't mess up the global state (add_messages) logic.
+        safe_messages = sanitize_messages(
+            messages,
+            max_tokens=self._max_tokens
+        )
+        # -------------------------------
 
         # Get device inventory
         inventory_str = self._device_inventory.get_device_info()
@@ -35,7 +48,7 @@ class UnderstandingNode(AgentNode):
         prompt = NetworkAgentPrompts.UNDERSTAND_PROMPT.invoke(
             {
                 "device_inventory": inventory_str,
-                "messages": messages,
+                "messages": safe_messages, # Pass safe messages, not raw state
             }
         )
 

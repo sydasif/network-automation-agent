@@ -34,7 +34,7 @@ class NetworkAgentConfig:
         self._llm_model_name = os.getenv("LLM_MODEL_NAME", "openai/gpt-oss-120b")
         self._llm_model_secondary = os.getenv("LLM_MODEL_SECONDARY", "llama-3.3-70b-versatile")
         self._llm_temperature = float(os.getenv("LLM_TEMPERATURE", "0.7"))
-        self._max_history_tokens = int(os.getenv("MAX_HISTORY_TOKENS", "2000"))
+        self._max_history_tokens = int(os.getenv("MAX_HISTORY_TOKENS", "1500"))
 
         # Nornir configuration
         self._num_workers = int(os.getenv("NUM_WORKERS", "20"))

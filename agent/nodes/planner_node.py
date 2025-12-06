@@ -5,6 +5,8 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 from utils.llm_helpers import parse_json_from_llm_response
+# Import middleware for sanitization
+from utils.memory import sanitize_messages
 
 from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
@@ -21,7 +23,14 @@ class PlannerNode(AgentNode):
         if not messages:
             return state
 
-        last_msg = messages[-1]
+        # --- APPLY MEMORY MIDDLEWARE ---
+        safe_messages = sanitize_messages(
+            messages,
+            max_tokens=1000  # Planner needs less context usually
+        )
+        # -------------------------------
+
+        last_msg = safe_messages[-1]  # Use safe message
         user_request = (
             last_msg.content if isinstance(last_msg, HumanMessage) else str(last_msg.content)
         )

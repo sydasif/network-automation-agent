@@ -1,137 +1,28 @@
-"""Context manager node for conversation history management."""
+"""Context manager node that passes state through without modification."""
 
 import logging
 from typing import Any
 
-from langchain_core.messages import SystemMessage, trim_messages
-from langchain_core.messages.utils import count_tokens_approximately
-
 from agent.nodes.base_node import AgentNode
-from agent.prompts import NetworkAgentPrompts
 from core.llm_provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
 
 class ContextManagerNode(AgentNode):
-    """Manages conversation history and context window."""
+    """Passes state through without modification to avoid message duplication."""
 
     def __init__(
         self,
         llm_provider: LLMProvider,
-        max_history_tokens: int = 3500,
+        max_history_tokens: int = 1500,
     ):
         super().__init__(llm_provider)
         self._max_history_tokens = max_history_tokens
 
     def execute(self, state: dict[str, Any]) -> dict[str, Any]:
-        """Manage conversation history and context window."""
+        """Pass state through without modification - local sanitization in other nodes."""
+        # Log state size for debugging but don't modify messages
         messages = state.get("messages", [])
-
-        # Compress large tool outputs to save tokens
-        # We process a copy to avoid mutating the original state directly if not needed,
-        # but here we want to update the memory.
-        messages = self._compress_tool_outputs(messages)
-
-        # Trim messages to fit within context window
-        trimmed_msgs = self._trim_messages(messages)
-
-        return {"messages": trimmed_msgs}
-
-    def _compress_tool_outputs(self, messages: list) -> list:
-        """Compress large tool outputs in history."""
-        from langchain_core.messages import ToolMessage
-
-        MAX_TOOL_OUTPUT_CHARS = 500
-        compressed_messages = []
-
-        for msg in messages:
-            # Only compress ToolMessages that are NOT the very last message
-            # (We want to see the full output of the just-executed command)
-            if (
-                isinstance(msg, ToolMessage)
-                and len(msg.content) > MAX_TOOL_OUTPUT_CHARS
-                and msg != messages[-1]
-            ):
-                # Create a copy with truncated content
-                new_content = (
-                    f"{msg.content[:MAX_TOOL_OUTPUT_CHARS]}...\n"
-                    f"[Output truncated. Original length: {len(msg.content)} chars]"
-                )
-                # Create new instance with same attributes but new content
-                new_msg = ToolMessage(
-                    content=new_content,
-                    tool_call_id=msg.tool_call_id,
-                    name=msg.name,
-                    status=msg.status,
-                    artifact=msg.artifact,
-                )
-                compressed_messages.append(new_msg)
-            else:
-                compressed_messages.append(msg)
-
-        return compressed_messages
-
-    def _trim_messages(self, messages: list) -> list:
-        """Trim messages to fit within context window."""
-        try:
-            trimmed_msgs = trim_messages(
-                messages,
-                max_tokens=self._max_history_tokens,
-                strategy="last",
-                token_counter=count_tokens_approximately,
-                start_on="human",
-                include_system=False,
-                allow_partial=False,
-            )
-
-            # Log if trimming occurred
-            if len(messages) > len(trimmed_msgs):
-                original_tokens = count_tokens_approximately(messages)
-                trimmed_tokens = count_tokens_approximately(trimmed_msgs)
-
-                logger.info(
-                    f"Context trimmed: {len(messages)} messages (~{original_tokens} tokens) "
-                    f"→ {len(trimmed_msgs)} messages (~{trimmed_tokens} tokens)"
-                )
-
-                # Summarize dropped messages
-                dropped_count = len(messages) - len(trimmed_msgs)
-                if dropped_count > 0:
-                    dropped_msgs = messages[:dropped_count]
-                    summary = self._summarize_messages(dropped_msgs)
-
-                    summary_msg = SystemMessage(
-                        content=f"Previous Conversation Summary:\n{summary}"
-                    )
-                    trimmed_msgs = [summary_msg] + trimmed_msgs
-                    logger.info("Added conversation summary for dropped messages.")
-
-            return trimmed_msgs
-
-        except Exception as trim_error:
-            logger.warning(
-                f"Message trimming failed ({type(trim_error).__name__}): {trim_error}. "
-                "Using fallback strategy."
-            )
-            # Fallback: keep last 10 messages
-            return messages[-10:] if len(messages) > 10 else messages
-
-    def _summarize_messages(self, messages: list) -> str:
-        """Summarize messages using secondary LLM (better for summarization tasks)."""
-        llm = self._get_secondary_llm()
-
-        # Prepare content string for the template
-        content_parts = []
-        for msg in messages:
-            role = "User" if hasattr(msg, "role") and msg.role != "assistant" else "User"
-            if hasattr(msg, "content"):
-                content_parts.append(f"{role}: {msg.content}")
-
-        # Use ChatPromptTemplate
-        prompt = NetworkAgentPrompts.SUMMARY_PROMPT.invoke(
-            {"messages_content": "\n".join(content_parts)}
-        )
-
-        response = llm.invoke(prompt)
-        return response.content
+        logger.debug(f"ContextManagerNode: State has {len(messages)} messages")
+        return {}  # Return empty dict to avoid message duplication
