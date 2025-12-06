@@ -6,7 +6,6 @@ import pytest
 from langchain_core.messages import HumanMessage
 
 from agent.nodes.understanding_node import UnderstandingNode
-from core.config import NetworkAgentConfig
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 

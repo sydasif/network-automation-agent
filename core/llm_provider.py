@@ -8,7 +8,6 @@ import logging
 
 from langchain_core.language_models import BaseChatModel
 from langchain_groq import ChatGroq
-from pydantic import BaseModel
 
 from core.config import NetworkAgentConfig
 from core.token_manager import TokenManager
@@ -31,7 +30,6 @@ class LLMProvider:
         """
         self._config = config
         self._primary_llm: BaseChatModel | None = None
-        self._secondary_llm: BaseChatModel | None = None
         self._token_manager = TokenManager()
 
     def get_primary_llm(self) -> BaseChatModel:
@@ -45,19 +43,6 @@ class LLMProvider:
                 model_name=self._config.llm_model_name, temperature=self._config.llm_temperature
             )
         return self._primary_llm
-
-    def get_secondary_llm(self) -> BaseChatModel:
-        """Get Secondary LLM instance (Fast/Formatting).
-
-        Returns:
-            Configured LLM instance
-        """
-        if self._secondary_llm is None:
-            self._secondary_llm = self._create_llm(
-                model_name=self._config.llm_model_secondary,
-                temperature=0.0,  # Always 0 for strict formatting
-            )
-        return self._secondary_llm
 
     def get_llm(self) -> BaseChatModel:
         """Legacy alias for get_primary_llm."""
@@ -74,13 +59,6 @@ class LLMProvider:
         """
         base_llm = self.get_primary_llm()
         return base_llm.bind_tools(tools)
-
-    def create_structured_llm(self, schema: type[BaseModel]):
-        """Create Secondary LLM with structured output.
-
-        Using Secondary LLM for formatting tasks is cheaper and faster.
-        """
-        return self.get_secondary_llm().with_structured_output(schema)
 
     def _create_llm(self, model_name: str, temperature: float) -> BaseChatModel:
         """Create and configure a new LLM instance.
@@ -116,4 +94,3 @@ class LLMProvider:
     def reset(self) -> None:
         """Reset cached LLM instances."""
         self._primary_llm = None
-        self._secondary_llm = None

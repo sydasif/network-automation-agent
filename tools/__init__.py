@@ -7,7 +7,6 @@ Tools can be added/removed by creating new tool classes and registering them her
 from core.task_executor import TaskExecutor
 from tools.base_tool import NetworkTool
 from tools.config_tool import ConfigCommandTool
-from tools.format_tool import FormatOutputTool
 from tools.multi_command import MultiCommandTool
 from tools.response_tool import ResponseTool
 from tools.show_tool import ShowCommandTool
@@ -38,25 +37,11 @@ def create_tools(task_executor: TaskExecutor) -> list:
     return [tool.to_langchain_tool() for tool in tools]
 
 
-def create_format_tool() -> FormatOutputTool:
-    """Create the format_output tool separately.
-
-    This tool is used by FormatNode and should not be available
-    to the main agent routing.
-
-    Returns:
-        FormatOutputTool instance
-    """
-    return FormatOutputTool()
-
-
 __all__ = [
     "NetworkTool",
     "ShowCommandTool",
     "ConfigCommandTool",
     "MultiCommandTool",
     "ResponseTool",
-    "FormatOutputTool",
     "create_tools",
-    "create_format_tool",
 ]

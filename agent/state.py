@@ -23,10 +23,7 @@ class State(TypedDict):
 NODE_PLANNER = "planner"
 NODE_APPROVAL = "approval"
 NODE_EXECUTE = "execute"
-NODE_FORMAT = "format"
-NODE_CONTEXT_MANAGER = "context_manager"
 NODE_UNDERSTANDING = "understanding"
-NODE_VALIDATION = "validation"
 
 # Resume constants for approval node
 RESUME_APPROVED = "approved"

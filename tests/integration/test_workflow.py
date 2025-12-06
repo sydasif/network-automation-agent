@@ -67,9 +67,7 @@ def test_workflow_show_command(mock_infrastructure):
         ],
     )
 
-    final_response_msg = AIMessage(
-        content='{"summary": "Version info", "structured_data": {"version": "1.0"}, "errors": []}'
-    )
+    final_response_msg = AIMessage(content="R1 is running Version 1.0")
 
     mock_llm.invoke.side_effect = [
         tool_call_msg,  # First call (Understand -> Tool)
@@ -103,12 +101,10 @@ def test_workflow_show_command(mock_infrastructure):
     assert call_args.kwargs["target_devices"] == ["R1"]
     assert call_args.kwargs["command_string"] == "show version"
 
-    # Verify final response structure (now formatted as JSON by FormatNode)
+    # Verify final response content (now as natural language)
     last_msg = result["messages"][-1]
-    assert "Version info" in last_msg.content
-    assert "version" in last_msg.content
-    assert "R1" in last_msg.content or "1.0" in last_msg.content
-    assert "Cisco IOS Version 1.0" in str(result) or "1.0" in last_msg.content
+    assert "Version 1.0" in last_msg.content
+    # Ensure we are NOT checking for 'structured_data' key
 
 
 def test_workflow_config_approval(mock_infrastructure):
@@ -137,9 +133,7 @@ def test_workflow_config_approval(mock_infrastructure):
         ],
     )
 
-    final_response_msg = AIMessage(
-        content='{"summary": "Config applied", "structured_data": {}, "errors": []}'
-    )
+    final_response_msg = AIMessage(content="Configuration applied successfully to R1")
 
     mock_llm.invoke.side_effect = [
         tool_call_msg,  # First call
@@ -199,8 +193,7 @@ def test_workflow_config_approval(mock_infrastructure):
     call_args = task_executor.execute_task.call_args
     assert call_args.kwargs["target_devices"] == ["R1"]
 
-    # Verify final response (now formatted as JSON by FormatNode)
+    # Verify final response (now as natural language)
     last_msg = result["messages"][-1]
-    assert "Config applied" in last_msg.content or "Configuration applied" in last_msg.content
-    assert "R1" in str(result) or "1.1.1.1" in str(result)
-    assert "Configuration applied" in str(result)
+    assert "Configuration applied" in last_msg.content
+    assert "R1" in last_msg.content
