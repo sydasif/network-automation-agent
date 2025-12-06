@@ -42,12 +42,20 @@ class TaskExecutor:
         """Execute Nornir task with network-aware error handling.
 
         Args:
-            target_devices: Single device or list of devices to target
-            task_function: Nornir task function to execute
-            **kwargs: Additional arguments to pass to task function
+            target_devices: Single device or list of devices to target.
+            task_function: Nornir task function to execute.
+            **kwargs: Additional arguments to pass to task function.
 
         Returns:
-            Dict mapping hostname to execution result with success/error info
+            Dict mapping hostname to execution result with success/error info.
+            Format:
+            {
+                "hostname": {
+                    "success": bool,
+                    "output": Any,  # Result from task if successful
+                    "error": str | None  # Error message if failed
+                }
+            }
 
         Example:
             >>> executor = TaskExecutor(nornir_manager)

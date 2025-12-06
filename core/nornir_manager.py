@@ -15,6 +15,8 @@ class NornirManager:
 
     This class encapsulates Nornir initialization and provides a clean
     interface for accessing the Nornir instance and inventory.
+    It implements the Singleton pattern via lazy loading to ensuring only
+    one Nornir instance is active.
     """
 
     def __init__(self, config: NetworkAgentConfig):

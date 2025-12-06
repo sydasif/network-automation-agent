@@ -37,9 +37,7 @@ class FormatNode(AgentNode):
             return {"messages": [AIMessage(content="No tool output to format")]}
 
         # Use new ChatPromptTemplate
-        prompt = NetworkAgentPrompts.FORMAT_PROMPT.invoke({
-            "tool_output": last_tool_msg.content
-        })
+        prompt = NetworkAgentPrompts.FORMAT_PROMPT.invoke({"tool_output": last_tool_msg.content})
 
         try:
             # Bind format_output tool to LLM
@@ -51,6 +49,7 @@ class FormatNode(AgentNode):
             # Check if LLM called the tool
             if hasattr(response, "tool_calls") and response.tool_calls:
                 from langgraph.prebuilt import ToolNode
+
                 tool_node = ToolNode([self._format_tool.to_langchain_tool()])
                 tool_result = tool_node.invoke({"messages": [response]})
                 return tool_result

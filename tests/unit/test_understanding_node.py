@@ -46,7 +46,15 @@ def test_understanding_node_execute(understanding_node):
     messages = [HumanMessage(content="Show me the status of router1")]
     state = {"messages": messages}
 
-    # Since we're mocking, we expect this to work without actual LLM calls
+    # Mock the LLM and its response
+    mock_response = Mock()
+    mock_response.tool_calls = []
+    mock_llm = Mock()
+    mock_llm.invoke.return_value = mock_response
+
+    # Patch _get_llm_with_tools to return our mock LLM
+    understanding_node._get_llm_with_tools = Mock(return_value=mock_llm)
+
     result = understanding_node.execute(state)
 
     assert "messages" in result

@@ -12,19 +12,19 @@ from langgraph.types import StateSnapshot
 
 from agent.nodes import (
     ApprovalNode,
+    ContextManagerNode,
     ExecuteNode,
     FormatNode,
     PlannerNode,
-    ContextManagerNode,
     UnderstandingNode,
     ValidationNode,
 )
 from agent.state import (
     NODE_APPROVAL,
+    NODE_CONTEXT_MANAGER,
     NODE_EXECUTE,
     NODE_FORMAT,
     NODE_PLANNER,
-    NODE_CONTEXT_MANAGER,
     NODE_UNDERSTANDING,
     NODE_VALIDATION,
     State,
@@ -40,9 +40,10 @@ logger = logging.getLogger(__name__)
 class NetworkAgentWorkflow:
     """Manages the LangGraph workflow for the network agent with split router responsibilities.
 
-    This class encapsulates workflow creation, configuration,
-    and provides utilities for workflow management using the new
-    context manager → understanding → validation workflow.
+    This class encapsulates workflow creation, configuration, and provides utilities
+    for workflow management. It implements a specific architectural pattern using
+    a "Context Manager -> Understanding -> Validation" flow before routing to execution
+    or planning, ensuring requests are fully understood and validated before action.
     """
 
     def __init__(
@@ -79,6 +80,9 @@ class NetworkAgentWorkflow:
             return self._graph
 
         # Create node instances with split responsibilities
+        # - ContextManager: Handles conversation history and context
+        # - Understanding: Analyzes user intent and selects potential tools
+        # - Validation: Verifies if the intent is actionable and safe
         context_manager_node = ContextManagerNode(
             self._llm_provider,
             self._max_history_tokens,
@@ -113,6 +117,7 @@ class NetworkAgentWorkflow:
         workflow.set_entry_point(NODE_CONTEXT_MANAGER)
 
         # Define the new workflow: CONTEXT_MANAGER → UNDERSTANDING → VALIDATION → [routing]
+        # This linear sequence ensures state is built up progressively
         workflow.add_edge(NODE_CONTEXT_MANAGER, NODE_UNDERSTANDING)
         workflow.add_edge(NODE_UNDERSTANDING, NODE_VALIDATION)
 
@@ -139,6 +144,7 @@ class NetworkAgentWorkflow:
         )
 
         # Execution and planning output go to Format node
+        # This ensures all final outputs are consistently formatted before returning to user
         workflow.add_edge(NODE_EXECUTE, NODE_FORMAT)
         workflow.add_edge(NODE_PLANNER, NODE_FORMAT)
         workflow.add_edge(NODE_FORMAT, END)
@@ -221,6 +227,6 @@ class NetworkAgentWorkflow:
         if "tool_calls" in interrupt_value:
             return {"tool_calls": interrupt_value["tool_calls"]}
         elif "tool_call" in interrupt_value:
-             return {"tool_calls": [interrupt_value["tool_call"]]}
+            return {"tool_calls": [interrupt_value["tool_call"]]}
 
         return None

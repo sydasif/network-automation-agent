@@ -28,19 +28,13 @@ class ApprovalNode(AgentNode):
             return None
 
         # Identify sensitive calls (config_command)
-        sensitive_calls = [
-            tc for tc in last_msg.tool_calls
-            if tc["name"] == "config_command"
-        ]
+        sensitive_calls = [tc for tc in last_msg.tool_calls if tc["name"] == "config_command"]
 
         if not sensitive_calls:
             return None
 
         # Interrupt workflow and wait for user decision on the BATCH of calls
-        decision = interrupt({
-            "type": "approval_request",
-            "tool_calls": sensitive_calls
-        })
+        decision = interrupt({"type": "approval_request", "tool_calls": sensitive_calls})
 
         if decision == RESUME_APPROVED:
             logger.info(f"User approved batch of {len(sensitive_calls)} calls")
@@ -51,7 +45,7 @@ class ApprovalNode(AgentNode):
         denial_messages = [
             ToolMessage(
                 tool_call_id=tc["id"],
-                content=f"❌ User denied permission for operation: {tc['name']}"
+                content=f"❌ User denied permission for operation: {tc['name']}",
             )
             for tc in sensitive_calls
         ]

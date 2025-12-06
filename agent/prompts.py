@@ -17,8 +17,11 @@ Messages:
     )
 
     # Understanding Node Prompt (Aggressively Updated for Parallelism)
-    UNDERSTAND_PROMPT = ChatPromptTemplate.from_messages([
-        ("system", """You are a network automation assistant.
+    UNDERSTAND_PROMPT = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a network automation assistant.
 
 Device inventory:
 {device_inventory}
@@ -55,13 +58,18 @@ DECISION TREE:
 VALIDATION:
 - Verify device names exist.
 - Ensure commands are valid for the platform.
-"""),
-        ("placeholder", "{messages}")
-    ])
+""",
+            ),
+            ("placeholder", "{messages}"),
+        ]
+    )
 
     # Format Node Prompt (Updated for Balanced Summary)
-    FORMAT_PROMPT = ChatPromptTemplate.from_messages([
-        ("system", """You are a network automation assistant analyzing command output.
+    FORMAT_PROMPT = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a network automation assistant analyzing command output.
 
 Your task is to structure the following tool output into a clear, organized response.
 
@@ -79,8 +87,10 @@ CRITICAL FORMATTING RULES:
 3. INCLUDE: Interface statuses, IP addresses, routing protocol states, and specific errors.
 4. LARGE DATA HANDLING: If the output is large raw text (like 'show running-config'), do NOT try to put the whole text into 'structured_data'. Instead, set 'structured_data' to an empty object {{}} or extract only specific key values.
 
-You MUST call the format_output tool. Do NOT return plain text.""")
-    ])
+You MUST call the format_output tool. Do NOT return plain text.""",
+            )
+        ]
+    )
 
     # Planner Node Prompt (Unchanged)
     PLANNER_PROMPT = ChatPromptTemplate.from_template(

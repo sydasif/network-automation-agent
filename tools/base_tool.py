@@ -14,6 +14,12 @@ class NetworkTool(ABC):
 
     This abstract class defines the interface that all tools must implement.
     Tools can be registered and discovered through the tool registry.
+
+    Lifecycle:
+    1. Tool is instantiated with configuration
+    2. Tool details (name, description, schema) are exposed to LLM
+    3. LLM invokes tool with arguments matching args_schema
+    4. _run() method is executed with provided arguments
     """
 
     @property
