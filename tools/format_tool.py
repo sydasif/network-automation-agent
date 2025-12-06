@@ -42,11 +42,8 @@ class FormatOutputTool(NetworkTool):
     def description(self) -> str:
         """Tool description."""
         return (
-            "Format network command output into structured JSON response. "
-            "Use this tool to return the final formatted output to the user. "
-            "Provide a human-readable summary, structured data (parsed from device output), "
-            "and any errors encountered. "
-            "This is the FINAL step - call this tool to complete the request."
+            "Format final output. Provide summary, structured_data, and errors. "
+            "Call this to complete the request."
         )
 
     @property

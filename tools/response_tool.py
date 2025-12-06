@@ -30,11 +30,7 @@ class ResponseTool(NetworkTool):
     @property
     def description(self) -> str:
         """Tool description."""
-        return (
-            "Send a final response to the user. "
-            "Call this ONLY when all requested tasks are complete. "
-            "Do not call for intermediate steps or tool outputs."
-        )
+        return "Send final response to user. Call ONLY when task complete."
 
     @property
     def args_schema(self) -> type[BaseModel]:

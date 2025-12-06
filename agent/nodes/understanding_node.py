@@ -28,15 +28,13 @@ class UnderstandingNode(AgentNode):
         """Understand user intent and select tools."""
         messages = state.get("messages", [])
 
-        # Get device inventory and tool descriptions
+        # Get device inventory
         inventory_str = self._device_inventory.get_device_info()
-        tools_desc = self._format_tools_description(self._tools)
 
         # Generate prompt using ChatPromptTemplate
         prompt = NetworkAgentPrompts.UNDERSTAND_PROMPT.invoke(
             {
                 "device_inventory": inventory_str,
-                "tools_description": tools_desc,
                 "messages": messages,
             }
         )

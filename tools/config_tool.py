@@ -46,12 +46,9 @@ class ConfigCommandTool(NetworkTool):
     def description(self) -> str:
         """Tool description."""
         return (
-            "Apply configuration changes to network devices. "
-            "REQUIRES USER APPROVAL: User must approve before execution. "
-            "Use for: interface configurations, routing protocols (OSPF/BGP/EIGRP), "
-            "ACLs, VLANs, system settings. "
-            "REQUIREMENT: Commands MUST match device platform syntax (IOS/EOS/JunOS). "
-            "Changes apply to running-config only - use separate save command to persist to startup-config."
+            "Apply config changes to devices. REQUIRES APPROVAL. "
+            "Use for: interfaces, routing, ACLs, VLANs. "
+            "REQUIREMENT: Use valid device platform syntax. "
         )
 
     @property

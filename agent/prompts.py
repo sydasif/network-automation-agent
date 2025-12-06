@@ -47,9 +47,6 @@ Response:
   ToolCall 1: config_command(devices=['sw1'], configs=['vlan 10'])
   (Waiting for result...) -> THIS IS WRONG.
 
-Available Tools:
-{tools_description}
-
 DECISION TREE:
 1. SAME config, MANY devices -> One call: config_command(devices=['sw1', 'sw2'], ...)
 2. DIFF config, MANY devices -> MANY calls in parallel.

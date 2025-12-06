@@ -31,11 +31,8 @@ class MultiCommandTool(NetworkTool):
     def description(self) -> str:
         """Tool description."""
         return (
-            "Generate a step-by-step execution plan for complex network automation tasks. "
-            "Use this when a request requires multiple coordinated actions, such as: "
-            "multi-device configurations, multi-step workflows with verification, "
-            "conditional operations, or complex troubleshooting sequences. "
-            "Do NOT use for simple single-device, single-command operations."
+            "Plan complex multi-step/multi-device operations. "
+            "Use for: coordination, verification steps, troubleshooting sequences. "
         )
 
     @property
