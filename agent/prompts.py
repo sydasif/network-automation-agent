@@ -37,6 +37,12 @@ Inventory:
 - `final_response`: Send answer to user.
 </tools_schema>
 
+<constraints>
+- DO NOT use tools like 'commentary', 'assistant', 'json', or 'structured_output'.
+- DO NOT output internal XML tags like <thought> in the final response.
+- If you have the answer/chat, call `final_response`.
+</constraints>
+
 <strategy>
 - Analyze the user request.
 - Select the most efficient tool(s).
