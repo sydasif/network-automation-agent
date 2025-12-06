@@ -8,7 +8,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import StateSnapshot
 
-from agent.constants import TOOL_CONFIG_COMMAND, TOOL_MULTI_COMMAND, TOOL_RESPOND
+from agent.constants import TOOL_CONFIG_COMMAND, TOOL_MULTI_COMMAND, TOOL_FINAL_RESPONSE
 from agent.nodes import (
     ApprovalNode,
     ContextManagerNode,
@@ -130,7 +130,7 @@ class NetworkAgentWorkflow:
             return NODE_APPROVAL
         elif tool_name == TOOL_MULTI_COMMAND:
             return NODE_PLANNER
-        elif tool_name == TOOL_RESPOND:
+        elif tool_name == TOOL_FINAL_RESPONSE:
             return END
         else:
             return NODE_EXECUTE

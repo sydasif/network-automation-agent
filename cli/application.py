@@ -218,10 +218,10 @@ class NetworkAgentCLI:
 
         last_msg = result["messages"][-1]
 
-        # Check for respond tool call
+        # Check for final_response tool call
         if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
             for tool_call in last_msg.tool_calls:
-                if tool_call["name"] == "respond":
+                if tool_call["name"] == "final_response":
                     self._ui.print_output(tool_call["args"])
                     return
 

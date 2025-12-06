@@ -6,13 +6,18 @@ import pytest
 from langchain_core.messages import HumanMessage
 
 from agent.nodes.understanding_node import UnderstandingNode
+from core.config import NetworkAgentConfig
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 
 
 @pytest.fixture
 def llm_provider():
-    return Mock(spec=LLMProvider)
+    mock_config = Mock()
+    mock_config.max_history_tokens = 1500
+    mock_provider = Mock(spec=LLMProvider)
+    mock_provider._config = mock_config
+    return mock_provider
 
 
 @pytest.fixture
@@ -34,6 +39,12 @@ def test_understanding_node_initialization(llm_provider, device_inventory):
     mock_tool = Mock()
     mock_tool.name = "test_tool"
     tools = [mock_tool]
+
+    # Properly mock the config for the LLM provider
+    mock_config = Mock()
+    mock_config.max_history_tokens = 1500
+    llm_provider._config = mock_config
+
     node = UnderstandingNode(llm_provider, device_inventory, tools)
 
     assert node._device_inventory == device_inventory

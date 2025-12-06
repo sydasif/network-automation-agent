@@ -20,7 +20,7 @@ class FormatOutputInput(BaseModel):
     structured_data: dict | list = Field(
         description="The parsed data from device output as a dictionary or list."
     )
-    errors: list[str] | None = Field(
+    errors: list[dict | str] | None = Field(
         default=None,
         description="List of any errors encountered during execution (or null if none).",
     )
@@ -52,7 +52,7 @@ class FormatOutputTool(NetworkTool):
         return FormatOutputInput
 
     def _run(
-        self, summary: str, structured_data: dict | list, errors: list[str] | None = None
+        self, summary: str, structured_data: dict | list, errors: list[dict | str] | None = None
     ) -> str:
         """Format output into structured response.
 

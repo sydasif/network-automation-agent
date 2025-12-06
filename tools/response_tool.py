@@ -25,7 +25,7 @@ class ResponseTool(NetworkTool):
     @property
     def name(self) -> str:
         """Tool name."""
-        return "respond"
+        return "final_response"
 
     @property
     def description(self) -> str:

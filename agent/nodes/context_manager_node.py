@@ -25,4 +25,5 @@ class ContextManagerNode(AgentNode):
         # Log state size for debugging but don't modify messages
         messages = state.get("messages", [])
         logger.debug(f"ContextManagerNode: State has {len(messages)} messages")
-        return {}  # Return empty dict to avoid message duplication
+        # Return the state with messages instead of an empty dict
+        return {"messages": messages}

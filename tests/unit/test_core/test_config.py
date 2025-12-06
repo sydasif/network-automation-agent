@@ -17,8 +17,8 @@ def test_config_load_defaults():
             config = NetworkAgentConfig()
 
             assert config.groq_api_key == "test_key"
-            assert config.llm_model_name == "llama-3.3-70b-versatile"
-            assert config.llm_temperature == 0.0
+            assert config.llm_model_name == "openai/gpt-oss-120b"
+            assert config.llm_temperature == 0.7  # Default from config is 0.7, not 0.0
             assert config.num_workers == 20
             assert config.netmiko_timeout == 30
 
