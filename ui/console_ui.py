@@ -331,7 +331,7 @@ def setup_colored_logging():
     """
     console = Console()
     handler = ColoredLogHandler(console)
-    handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
+    handler.setFormatter(logging.Formatter("{levelname} - {message}", style="{"))
 
     # Add handler to root logger
     root_logger = logging.getLogger()
