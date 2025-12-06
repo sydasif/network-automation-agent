@@ -20,3 +20,4 @@ todo.md
 hosts.yaml
 groups.yaml
 nornir.log
+.agent*

@@ -233,3 +233,4 @@ class NetworkAgentCLI:
         """Cleanup resources before shutdown."""
         logger.info("Cleaning up application resources...")
         self._nornir_manager.close()
+        self._workflow.close()  # Close the workflow to clean up DB connection

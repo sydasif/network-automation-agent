@@ -20,11 +20,11 @@ def sanitize_messages(
 ) -> List[BaseMessage]:
     """
     Sanitize messages before sending to LLM to prevent 413/Rate Limit errors.
-    
+
     Acts as middleware to:
     1. Compress massive tool outputs (like 'show running-config') in history.
     2. Strictly trim conversation to token limits using LangChain's trimmer.
-    
+
     Args:
         messages: The full message history.
         max_tokens: The strict token limit for the context window.
@@ -33,20 +33,23 @@ def sanitize_messages(
     if not messages:
         return []
 
+    # --- Safety Check ---
+    # We never want to compress the VERY last message, as the current Node
+    # might need to read it (e.g. FormatNode reading a tool output).
+    last_msg = messages[-1]
+    msgs_to_process = messages[:-1]
+
     # --- Step 1: Compress Old Tool Outputs ---
-    # We keep the last 2 turns (User+AI+Tool+AI) intact. 
-    # Anything older gets its Tool Outputs heavily truncated.
-    
-    # Heuristic: Keep last 6 messages untouched to allow "follow-up" logic to work
-    keep_intact_count = 6 
-    
+    # Heuristic: Keep last 5 messages intact (User-AI-Tool-AI sequence)
+    # Compress anything older than that.
+    keep_intact_count = 5
+
     optimized_messages = []
-    
-    # Process history (everything before the last few messages)
-    if len(messages) > keep_intact_count:
-        history_msgs = messages[:-keep_intact_count]
-        recent_msgs = messages[-keep_intact_count:]
-        
+
+    if len(msgs_to_process) > keep_intact_count:
+        history_msgs = msgs_to_process[:-keep_intact_count]
+        recent_msgs = msgs_to_process[-keep_intact_count:]
+
         for msg in history_msgs:
             if isinstance(msg, ToolMessage) and len(msg.content) > max_tool_output_length:
                 # Create a lightweight clone of the message
@@ -64,11 +67,14 @@ def sanitize_messages(
                 optimized_messages.append(compressed_msg)
             else:
                 optimized_messages.append(msg)
-        
+
         # Add recent messages back fully intact
         optimized_messages.extend(recent_msgs)
     else:
-        optimized_messages = list(messages)
+        optimized_messages = list(msgs_to_process)
+
+    # Add the last message back fully intact
+    optimized_messages.append(last_msg)
 
     # --- Step 2: Strict Token Trimming ---
     # This uses LangChain's official logic to ensure we fit in the context window
@@ -82,14 +88,14 @@ def sanitize_messages(
             allow_partial=False,
             start_on="human"
         )
-        
+
         # Log if we cut things out
         if len(final_messages) < len(optimized_messages):
             diff = len(optimized_messages) - len(final_messages)
-            logger.info(f"Memory Middleware: Trimmed {diff} messages to fit {max_tokens} token limit.")
-            
+            logger.debug(f"Memory Middleware: Trimmed {diff} messages to fit {max_tokens} token limit.")
+
         return final_messages
-        
+
     except Exception as e:
-        logger.error(f"Memory trimming failed: {e}. Falling back to raw truncation.")
+        logger.error(f"Memory trimming failed: {e}. Falling back to simple truncation.")
         return optimized_messages[-10:]
