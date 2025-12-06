@@ -11,6 +11,7 @@ from langchain_groq import ChatGroq
 from pydantic import BaseModel
 
 from core.config import NetworkAgentConfig
+from core.token_manager import TokenManager
 
 logger = logging.getLogger(__name__)
 
@@ -29,24 +30,41 @@ class LLMProvider:
             config: NetworkAgentConfig instance
         """
         self._config = config
-        self._llm: BaseChatModel | None = None
-        self._llm_with_tools: BaseChatModel | None = None
+        self._primary_llm: BaseChatModel | None = None
+        self._secondary_llm: BaseChatModel | None = None
+        self._token_manager = TokenManager()
 
-    def get_llm(self) -> BaseChatModel:
-        """Get base LLM instance (lazy-loaded singleton).
+    def get_primary_llm(self) -> BaseChatModel:
+        """Get Primary LLM instance (High Reasoning).
 
         Returns:
             Configured LLM instance
-
-        Raises:
-            RuntimeError: If GROQ_API_KEY is not configured
         """
-        if self._llm is None:
-            self._llm = self._create_llm()
-        return self._llm
+        if self._primary_llm is None:
+            self._primary_llm = self._create_llm(
+                model_name=self._config.llm_model_name, temperature=self._config.llm_temperature
+            )
+        return self._primary_llm
+
+    def get_secondary_llm(self) -> BaseChatModel:
+        """Get Secondary LLM instance (Fast/Formatting).
+
+        Returns:
+            Configured LLM instance
+        """
+        if self._secondary_llm is None:
+            self._secondary_llm = self._create_llm(
+                model_name=self._config.llm_model_secondary,
+                temperature=0.0,  # Always 0 for strict formatting
+            )
+        return self._secondary_llm
+
+    def get_llm(self) -> BaseChatModel:
+        """Legacy alias for get_primary_llm."""
+        return self.get_primary_llm()
 
     def get_llm_with_tools(self, tools: list) -> BaseChatModel:
-        """Get LLM instance with tools bound.
+        """Get Primary LLM instance with tools bound.
 
         Args:
             tools: List of tools to bind to LLM
@@ -54,57 +72,47 @@ class LLMProvider:
         Returns:
             LLM instance with tools bound
         """
-        # Note: We recreate this each time since tools may change
-        # In the future, we could cache based on tool list
-        base_llm = self.get_llm()
+        base_llm = self.get_primary_llm()
         return base_llm.bind_tools(tools)
 
     def create_structured_llm(self, schema: type[BaseModel]):
-        """Create LLM with structured output.
+        """Create Secondary LLM with structured output.
 
-        **WARNING - Groq API Incompatibility with some models**:
-        The `with_structured_output()` method may cause Groq API errors with certain models
-        (e.g., openai/gpt-oss-*):
-        - Error: "Tool choice is required, but model did not call a tool"
-        - Error: "attempted to call tool 'json' which was not in request.tools"
+        Using Secondary LLM for formatting tasks is cheaper and faster.
+        """
+        return self.get_secondary_llm().with_structured_output(schema)
 
-        **Recommendation**: Use manual JSON parsing for broader model compatibility.
-        See UnderstandNode._structure_tool_output() and PlannerNode.execute()
-        for the recommended pattern.
+    def _create_llm(self, model_name: str, temperature: float) -> BaseChatModel:
+        """Create and configure a new LLM instance.
 
         Args:
-            schema: Pydantic model for structured output
-
-        Returns:
-            LLM configured for structured output
-        """
-        return self.get_llm().with_structured_output(schema)
-
-    def _create_llm(self) -> BaseChatModel:
-        """Create and configure a new LLM instance.
+            model_name: Name of the model
+            temperature: Temperature setting
 
         Returns:
             Configured ChatGroq instance
-
-        Raises:
-            RuntimeError: If GROQ_API_KEY is not set
         """
-        logger.debug(
-            f"Initializing LLM with model: {self._config.llm_model_name}, "
-            f"temperature: {self._config.llm_temperature}"
-        )
+        logger.debug(f"Initializing LLM with model: {model_name}, temperature: {temperature}")
 
         return ChatGroq(
-            model=self._config.llm_model_name,
+            model=model_name,
             # Increased temperature to 0.2 to encourage parallel tool calling
-            temperature=max(self._config.llm_temperature, 0.2),
+            temperature=max(temperature, 0.2) if temperature > 0 else 0,
             groq_api_key=self._config.groq_api_key,
         )
 
-    def reset(self) -> None:
-        """Reset cached LLM instances.
+    def check_safe_to_send(self, messages: list) -> bool:
+        """Check if message payload is safe to send.
 
-        This can be useful for testing or when configuration changes.
+        Args:
+            messages: List of messages
+
+        Returns:
+            True if safe
         """
-        self._llm = None
-        self._llm_with_tools = None
+        return self._token_manager.check_safe_to_send(messages)
+
+    def reset(self) -> None:
+        """Reset cached LLM instances."""
+        self._primary_llm = None
+        self._secondary_llm = None

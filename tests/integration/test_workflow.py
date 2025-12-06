@@ -98,10 +98,11 @@ def test_workflow_show_command(mock_infrastructure):
     assert call_args.kwargs["target_devices"] == ["R1"]
     assert call_args.kwargs["command_string"] == "show version"
 
-    # Verify final response structure
+    # Verify final response structure (now formatted as JSON by FormatNode)
     last_msg = result["messages"][-1]
-    assert "summary" in last_msg.content
-    assert "Version info" in last_msg.content
+    assert "devices" in last_msg.content
+    assert "R1" in last_msg.content
+    assert "Cisco IOS Version 1.0" in last_msg.content
 
 
 def test_workflow_config_approval(mock_infrastructure):
@@ -192,6 +193,8 @@ def test_workflow_config_approval(mock_infrastructure):
     call_args = task_executor.execute_task.call_args
     assert call_args.kwargs["target_devices"] == ["R1"]
 
-    # Verify final response
+    # Verify final response (now formatted as JSON by FormatNode)
     last_msg = result["messages"][-1]
-    assert "Config applied" in last_msg.content
+    assert "devices" in last_msg.content
+    assert "R1" in last_msg.content
+    assert "Configuration applied" in last_msg.content

@@ -47,6 +47,7 @@ class ShowCommandTool(NetworkTool):
             "Run 'show' commands on network devices. "
             "Use for: viewing config, status, routing, ARP/MAC. "
             "REQUIREMENT: Use valid device names from inventory. "
+            "read-only operation. "
         )
 
     @property

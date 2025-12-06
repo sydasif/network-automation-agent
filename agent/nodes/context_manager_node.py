@@ -28,10 +28,49 @@ class ContextManagerNode(AgentNode):
         """Manage conversation history and context window."""
         messages = state.get("messages", [])
 
+        # Compress large tool outputs to save tokens
+        # We process a copy to avoid mutating the original state directly if not needed,
+        # but here we want to update the memory.
+        messages = self._compress_tool_outputs(messages)
+
         # Trim messages to fit within context window
         trimmed_msgs = self._trim_messages(messages)
 
         return {"messages": trimmed_msgs}
+
+    def _compress_tool_outputs(self, messages: list) -> list:
+        """Compress large tool outputs in history."""
+        from langchain_core.messages import ToolMessage
+
+        MAX_TOOL_OUTPUT_CHARS = 500
+        compressed_messages = []
+
+        for msg in messages:
+            # Only compress ToolMessages that are NOT the very last message
+            # (We want to see the full output of the just-executed command)
+            if (
+                isinstance(msg, ToolMessage)
+                and len(msg.content) > MAX_TOOL_OUTPUT_CHARS
+                and msg != messages[-1]
+            ):
+                # Create a copy with truncated content
+                new_content = (
+                    f"{msg.content[:MAX_TOOL_OUTPUT_CHARS]}...\n"
+                    f"[Output truncated. Original length: {len(msg.content)} chars]"
+                )
+                # Create new instance with same attributes but new content
+                new_msg = ToolMessage(
+                    content=new_content,
+                    tool_call_id=msg.tool_call_id,
+                    name=msg.name,
+                    status=msg.status,
+                    artifact=msg.artifact,
+                )
+                compressed_messages.append(new_msg)
+            else:
+                compressed_messages.append(msg)
+
+        return compressed_messages
 
     def _trim_messages(self, messages: list) -> list:
         """Trim messages to fit within context window."""
@@ -79,8 +118,8 @@ class ContextManagerNode(AgentNode):
             return messages[-10:] if len(messages) > 10 else messages
 
     def _summarize_messages(self, messages: list) -> str:
-        """Summarize messages using LLM."""
-        llm = self._get_llm()
+        """Summarize messages using secondary LLM (better for summarization tasks)."""
+        llm = self._get_secondary_llm()
 
         # Prepare content string for the template
         content_parts = []

@@ -70,6 +70,26 @@ class AgentNode(ABC):
         """
         return self._llm_provider.create_structured_llm(schema)
 
+    def _get_secondary_llm(self):
+        """Get the secondary LLM instance for formatting tasks.
+
+        Returns:
+            Configured secondary LLM instance
+        """
+        return self._llm_provider.get_secondary_llm()
+
+    def _get_secondary_llm_with_tools(self, tools: list):
+        """Get secondary LLM with tools bound for formatting tasks.
+
+        Args:
+            tools: List of tools to bind
+
+        Returns:
+            Secondary LLM with tools bound
+        """
+        base_llm = self._get_secondary_llm()
+        return base_llm.bind_tools(tools)
+
     def _get_latest_tool_message(self, state: dict[str, Any]) -> AIMessage | None:
         """Get the latest message if it has tool calls.
 

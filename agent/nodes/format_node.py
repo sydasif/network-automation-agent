@@ -40,8 +40,8 @@ class FormatNode(AgentNode):
         prompt = NetworkAgentPrompts.FORMAT_PROMPT.invoke({"tool_output": last_tool_msg.content})
 
         try:
-            # Bind format_output tool to LLM
-            llm_with_tool = self._get_llm_with_tools([self._format_tool.to_langchain_tool()])
+            # Bind format_output tool to secondary LLM (better for formatting tasks)
+            llm_with_tool = self._get_secondary_llm_with_tools([self._format_tool.to_langchain_tool()])
 
             # Invoke LLM with the formatted prompt
             response = llm_with_tool.invoke(prompt)
