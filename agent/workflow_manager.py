@@ -13,12 +13,14 @@ from agent.nodes import (
     ExecuteNode,
     PlannerNode,
     UnderstandingNode,
+    ResponseNode, # <--- Import new node
 )
 from agent.state import (
     NODE_APPROVAL,
     NODE_EXECUTE,
     NODE_PLANNER,
     NODE_UNDERSTANDING,
+    NODE_RESPONSE, # <--- Import new constant
     State,
 )
 from core.device_inventory import DeviceInventory
@@ -58,6 +60,7 @@ class NetworkAgentWorkflow:
         approval_node = ApprovalNode(self._llm_provider)
         planner_node = PlannerNode(self._llm_provider)
         execute_node = ExecuteNode(self._llm_provider, self._tools)
+        response_node = ResponseNode(self._llm_provider) # <--- Init response node
 
         workflow = StateGraph(State)
 
@@ -66,12 +69,13 @@ class NetworkAgentWorkflow:
         workflow.add_node(NODE_APPROVAL, approval_node.execute)
         workflow.add_node(NODE_PLANNER, planner_node.execute)
         workflow.add_node(NODE_EXECUTE, execute_node.execute)
+        workflow.add_node(NODE_RESPONSE, response_node.execute) # <--- Add to graph
 
         # Define Edges
         # START -> UNDERSTANDING
         workflow.set_entry_point(NODE_UNDERSTANDING)
 
-        # UNDERSTANDING -> [APPROVAL, PLANNER, EXECUTE, END]
+        # UNDERSTANDING -> [APPROVAL, PLANNER, EXECUTE, RESPONSE, END]
         workflow.add_conditional_edges(
             NODE_UNDERSTANDING,
             self._route_tool_calls,
@@ -79,6 +83,7 @@ class NetworkAgentWorkflow:
                 NODE_APPROVAL: NODE_APPROVAL,
                 NODE_PLANNER: NODE_PLANNER,
                 NODE_EXECUTE: NODE_EXECUTE,
+                NODE_RESPONSE: NODE_RESPONSE, # <--- Route to response node
                 END: END,
             },
         )
@@ -97,6 +102,9 @@ class NetworkAgentWorkflow:
         workflow.add_edge(NODE_EXECUTE, NODE_UNDERSTANDING)
         workflow.add_edge(NODE_PLANNER, NODE_UNDERSTANDING)
 
+        # Response node ends the flow
+        workflow.add_edge(NODE_RESPONSE, END)
+
         # Persistence
         logger.info(f"Initializing persistence at {self._db_path}")
         self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
@@ -110,16 +118,11 @@ class NetworkAgentWorkflow:
         """Decide next node based on the tool selected by UnderstandingNode."""
         last_message = state["messages"][-1]
 
-        # 1. SAFETY NET: If no tool calls and no content, force a retry
-        if not last_message.tool_calls and not last_message.content.strip():
-            # In a real scenario, we might want to inject a system error,
-            # but for now, we assume the UI handles empty responses or we end.
-            return END
-
-        # 2. If no tool calls but has text, it's a direct response -> END
+        # 1. NEW LOGIC: If no tool calls, it's a direct conversational response -> END
         if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
             return END
 
+        # 2. Handle Tool Calls
         tool_name = last_message.tool_calls[0]["name"]
 
         if tool_name == TOOL_CONFIG_COMMAND:
@@ -127,7 +130,7 @@ class NetworkAgentWorkflow:
         elif tool_name == TOOL_MULTI_COMMAND:
             return NODE_PLANNER
         elif tool_name == TOOL_FINAL_RESPONSE:
-            return END
+            return NODE_RESPONSE  # Data formatting node
         else:
             return NODE_EXECUTE
 

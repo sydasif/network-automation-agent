@@ -1,49 +1,26 @@
-"""Response tool for final user responses.
+"""Response tool for final user responses."""
 
-This module provides the ResponseTool class for formatting
-and returning final responses to users.
-"""
-
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel
 from tools.base_tool import NetworkTool
 
-
 class ResponseInput(BaseModel):
-    """Input schema for responses."""
-
-    message: str = Field(description="The response message to send to the user.")
-
+    """Input schema for responses. No arguments needed."""
+    pass
 
 class ResponseTool(NetworkTool):
-    """Send final response to the user.
-
-    This tool is used to format and return the final response
-    to the user after all tasks are complete.
-    """
+    """Signal to format and display network data."""
 
     @property
     def name(self) -> str:
-        """Tool name."""
         return "final_response"
 
     @property
     def description(self) -> str:
-        """Tool description."""
-        return "Send final response to user. Call ONLY when task complete."
+        return "Use this ONLY when you have raw network data (from show_command) that needs to be formatted for the user."
 
     @property
     def args_schema(self) -> type[BaseModel]:
-        """Arguments schema."""
         return ResponseInput
 
-    def _run(self, message: str) -> str:
-        """Return the response message.
-
-        Args:
-            message: The response message
-
-        Returns:
-            The response message
-        """
-        return message
+    def _run(self) -> str:
+        return "Routing to Response Node..."

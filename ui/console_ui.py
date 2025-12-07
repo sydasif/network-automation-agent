@@ -157,41 +157,42 @@ class NetworkAgentUI:
     def print_output(self, content: str | dict):
         """Display the command output with clear separation."""
 
-        data_to_print = content
-
-        # 1. Normalize input to dict if possible
+        # 1. Handle string input (legacy)
         if isinstance(content, str):
             try:
-                data_to_print = json.loads(content)
+                content = json.loads(content)
             except json.JSONDecodeError:
-                # Not JSON, treat as Markdown string
+                # For plain strings, wrap in Markdown for proper table/header rendering
                 self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue]")
                 self.console.print(Markdown(content))
-                self.console.print()  # Empty line
+                self.console.print()
                 return
 
-        # 2. Print based on type
-        if isinstance(data_to_print, dict) and "structured_data" in data_to_print:
-            self._print_structured_data(data_to_print)
-        elif (
-            isinstance(data_to_print, dict)
-            and "message" in data_to_print
-            and len(data_to_print) == 1
-        ):
-            # Simple conversational response - display as text with prefix
-            # Make sure we don't double print if the message is short
-            self.console.print(
-                f"[bold blue]{Emoji.AI} AI >[/bold blue] {data_to_print['message']}"
-            )
-            self.console.print()
-        elif isinstance(data_to_print, (dict, list)):
-            self.console.print_json(data=data_to_print)
-        else:
-            # Fallback for non-json string or other types
-            self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue] {content}")
+        # 2. Handle Dictionary (The new standard)
+        if isinstance(content, dict):
+            # Print the conversational message first
+            if "message" in content:
+                # Step A: Print the "AI >" label first
+                self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue]")
 
-        # Add empty line for spacing
-        self.console.print()
+                # Step B: Pass the text string into the Markdown class
+                # This triggers the table and header rendering
+                self.console.print(Markdown(content['message']))
+
+                self.console.print() # Add spacing
+
+            # B. Print the structured/raw data <-- COMMENT THIS SECTION OUT
+            # if "structured_data" in content and content["structured_data"]:
+            #     data = content["structured_data"]
+            #     self.console.print(f"[bold magenta]{Emoji.DATA} Raw Output:[/bold magenta]")
+            #
+            #     if isinstance(data, (dict, list)):
+            #         self.console.print(JSON.from_data(data))
+            #     elif isinstance(data, str):
+            #         self.console.print(Markdown(f"```text\n{data}\n```"))
+            #     else:
+            #         self.console.print(str(data))
+            #     self.console.print()
 
     def print_logging_separator(self):
         """Print a separator specifically for logging messages."""

@@ -24,6 +24,7 @@ NODE_PLANNER = "planner"
 NODE_APPROVAL = "approval"
 NODE_EXECUTE = "execute"
 NODE_UNDERSTANDING = "understanding"
+NODE_RESPONSE = "response"  # <--- Added this
 
 # Resume constants for approval node
 RESUME_APPROVED = "approved"
