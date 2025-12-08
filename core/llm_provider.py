@@ -90,7 +90,3 @@ class LLMProvider:
             True if safe
         """
         return self._token_manager.check_safe_to_send(messages)
-
-    def reset(self) -> None:
-        """Reset cached LLM instances."""
-        self._primary_llm = None

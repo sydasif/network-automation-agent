@@ -8,7 +8,6 @@ from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
-from utils.memory import sanitize_messages
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +37,11 @@ class UnderstandingNode(AgentNode):
                 # Inject a hint to the LLM
                 messages.append(SystemMessage(content="Error: You returned an empty response. Please clarify the request or call a tool."))
 
-        # --- APPLY MEMORY MIDDLEWARE ---
-        safe_messages = sanitize_messages(messages, max_tokens=self._max_tokens)
+        # --- APPLY MEMORY MANAGEMENT ---
+        # Check against safety limits
+        if not self._llm_provider.check_safe_to_send(messages):
+            logger.warning("Message history exceeds safety limits. Truncating to last 10 messages.")
+            messages = messages[-10:]
         # -------------------------------
 
         # Get device inventory
@@ -49,7 +51,7 @@ class UnderstandingNode(AgentNode):
         prompt = NetworkAgentPrompts.UNDERSTAND_PROMPT.invoke(
             {
                 "device_inventory": inventory_str,
-                "messages": safe_messages,
+                "messages": messages,
             }
         )
 

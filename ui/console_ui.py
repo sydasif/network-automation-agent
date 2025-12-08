@@ -181,18 +181,6 @@ class NetworkAgentUI:
 
                 self.console.print() # Add spacing
 
-            # B. Print the structured/raw data <-- COMMENT THIS SECTION OUT
-            # if "structured_data" in content and content["structured_data"]:
-            #     data = content["structured_data"]
-            #     self.console.print(f"[bold magenta]{Emoji.DATA} Raw Output:[/bold magenta]")
-            #
-            #     if isinstance(data, (dict, list)):
-            #         self.console.print(JSON.from_data(data))
-            #     elif isinstance(data, str):
-            #         self.console.print(Markdown(f"```text\n{data}\n```"))
-            #     else:
-            #         self.console.print(str(data))
-            #     self.console.print()
 
     def print_logging_separator(self):
         """Print a separator specifically for logging messages."""

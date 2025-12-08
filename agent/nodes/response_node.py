@@ -60,20 +60,6 @@ class ResponseNode(AgentNode):
                 # Merge logic: Create a wrapper to hold multiple results
                 merged_raw_data = {"batch_results": collected_data}
 
-                # OPTIONAL: If they all have "devices" key (standard Nornir format),
-                # we can try to merge them into one cleaner dict.
-                try:
-                    combined_devices = {}
-                    for item in collected_data:
-                        if isinstance(item, dict) and "devices" in item:
-                            combined_devices.update(item["devices"])
-
-                    if combined_devices:
-                        merged_raw_data = {"devices": combined_devices}
-                except Exception:
-                    # Fallback to simple list if merge fails
-                    merged_raw_data = {"batch_results": collected_data}
-
         # 4. Generate Summary
         prompt = NetworkAgentPrompts.RESPONSE_PROMPT.invoke({
             "user_query": user_query,
