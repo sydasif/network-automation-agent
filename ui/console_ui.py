@@ -130,29 +130,8 @@ class NetworkAgentUI:
 
     def _style_summary_keys(self, text: str) -> str:
         """Enhance markdown summary by bolding keys in list items."""
-        # Regex looks for lines starting with - or * followed by text and a colon
-        # It wraps the key part in ** to apply the strong style (bold cyan)
-        # Pattern captures: 1. bullet+space, 2. key text (non-greedy), 3. colon
         pattern = r"(?m)^(\s*[-*]\s+)([^:\n*]+)(:)"
         return re.sub(pattern, r"\1**\2**\3", text)
-
-    def _print_structured_data(self, data: dict):
-        """Helper to print structured network response."""
-        structured_data = data.get("structured_data")
-
-        # Only print structured data if it is not empty (None, {}, or [])
-        if structured_data:
-            self.console.print(f"[bold magenta]{Emoji.DATA} Structured Data:[/bold magenta]")
-            self.console.print(JSON.from_data(structured_data))
-
-        # Always print the summary
-        self.console.print(f"\n[bold magenta]{Emoji.RESULT} Summary:[/bold magenta]")
-        summary_text = self._style_summary_keys(data.get("summary", ""))
-        self.console.print(Markdown(summary_text), style="orange1")
-        self.console.print()
-
-        if data.get("errors"):
-            self.console.print(f"\n[bold red]{Emoji.ERROR} Errors:[/bold red] {data['errors']}")
 
     def print_output(self, content: str | dict):
         """Display the command output with clear separation."""
@@ -170,17 +149,23 @@ class NetworkAgentUI:
 
         # 2. Handle Dictionary (The new standard)
         if isinstance(content, dict):
-            # Print the conversational message first
-            if "message" in content:
-                # Step A: Print the "AI >" label first
+            # A. Print the conversational message (Summary)
+            if "message" in content and content["message"]:
                 self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue]")
-
-                # Step B: Pass the text string into the Markdown class
-                # This triggers the table and header rendering
                 self.console.print(Markdown(content['message']))
-
                 self.console.print() # Add spacing
-
+            elif "error" in content:
+                # Fallback if message is missing but error exists
+                self.console.print(f"[bold red]{Emoji.ERROR} Error:[/bold red] {content['error']}")
+                self.console.print()
+            elif not content:
+                # Empty dictionary
+                pass
+            else:
+                # Dictionary with other keys but no message
+                self.console.print(f"[bold blue]{Emoji.AI} AI (Raw Output) >[/bold blue]")
+                self.console.print(JSON.from_data(content))
+                self.console.print()
 
     def print_logging_separator(self):
         """Print a separator specifically for logging messages."""

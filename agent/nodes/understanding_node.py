@@ -11,6 +11,7 @@ from core.llm_provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
+
 class UnderstandingNode(AgentNode):
     """Understands user intent and selects tools."""
 
@@ -35,12 +36,18 @@ class UnderstandingNode(AgentNode):
             last_msg = messages[-1]
             if not last_msg.content and not last_msg.tool_calls:
                 # Inject a hint to the LLM
-                messages.append(SystemMessage(content="Error: You returned an empty response. Please clarify the request or call a tool."))
+                messages.append(
+                    SystemMessage(
+                        content="Error: You returned an empty response. Please clarify the request or call a tool."
+                    )
+                )
 
         # --- APPLY MEMORY MANAGEMENT ---
         # Check against safety limits
         if not self._llm_provider.check_safe_to_send(messages):
-            logger.warning("Message history exceeds safety limits. Truncating to last 10 messages.")
+            logger.warning(
+                "Message history exceeds safety limits. Truncating to last 10 messages."
+            )
             messages = messages[-10:]
         # -------------------------------
 

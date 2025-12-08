@@ -45,7 +45,10 @@ You are a Network Automation Assistant.
     Task:
     1. Analyze the Raw Data.
     2. Extract key metrics (structured_data).
-    3. Write a professional summary for the user.
-    4. Suggest 1-2 logical next steps (commands) if applicable.
+    3. Write a technical summary for the user in **Markdown**.
+       - Use **### Headings** to separate devices or topics.
+       - Use **Markdown Tables** to present lists (e.g., interfaces, neighbors, routes).
+       - Use **Bullet points** for status checks.
+       - Be concise but detailed.
     """
     )
