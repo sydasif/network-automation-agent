@@ -7,20 +7,18 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import StateSnapshot
 
-from agent.constants import TOOL_CONFIG_COMMAND, TOOL_MULTI_COMMAND, TOOL_FINAL_RESPONSE
+from agent.constants import TOOL_CONFIG_COMMAND
 from agent.nodes import (
     ApprovalNode,
     ExecuteNode,
-    PlannerNode,
     UnderstandingNode,
-    ResponseNode, # <--- Import new node
+    ResponseNode,
 )
 from agent.state import (
     NODE_APPROVAL,
     NODE_EXECUTE,
-    NODE_PLANNER,
     NODE_UNDERSTANDING,
-    NODE_RESPONSE, # <--- Import new constant
+    NODE_RESPONSE,
     State,
 )
 from core.device_inventory import DeviceInventory
@@ -58,51 +56,46 @@ class NetworkAgentWorkflow:
             self._llm_provider, self._device_inventory, self._tools
         )
         approval_node = ApprovalNode(self._llm_provider)
-        planner_node = PlannerNode(self._llm_provider)
         execute_node = ExecuteNode(self._llm_provider, self._tools)
-        response_node = ResponseNode(self._llm_provider) # <--- Init response node
+        response_node = ResponseNode(self._llm_provider)
 
         workflow = StateGraph(State)
 
         # Add Nodes
         workflow.add_node(NODE_UNDERSTANDING, understand_node.execute)
         workflow.add_node(NODE_APPROVAL, approval_node.execute)
-        workflow.add_node(NODE_PLANNER, planner_node.execute)
         workflow.add_node(NODE_EXECUTE, execute_node.execute)
-        workflow.add_node(NODE_RESPONSE, response_node.execute) # <--- Add to graph
+        workflow.add_node(NODE_RESPONSE, response_node.execute)
 
         # Define Edges
         # START -> UNDERSTANDING
         workflow.set_entry_point(NODE_UNDERSTANDING)
 
-        # UNDERSTANDING -> [APPROVAL, PLANNER, EXECUTE, RESPONSE, END]
+        # UNDERSTANDING -> [APPROVAL, EXECUTE, END]
         workflow.add_conditional_edges(
             NODE_UNDERSTANDING,
             self._route_tool_calls,
             {
                 NODE_APPROVAL: NODE_APPROVAL,
-                NODE_PLANNER: NODE_PLANNER,
                 NODE_EXECUTE: NODE_EXECUTE,
-                NODE_RESPONSE: NODE_RESPONSE, # <--- Route to response node
                 END: END,
             },
         )
 
-        # APPROVAL -> [EXECUTE, UNDERSTANDING (if denied)]
+        # APPROVAL -> [EXECUTE, RESPONSE (if denied)]
         workflow.add_conditional_edges(
             NODE_APPROVAL,
             self._route_approval,
             {
                 NODE_EXECUTE: NODE_EXECUTE,
-                NODE_UNDERSTANDING: NODE_UNDERSTANDING,
+                NODE_RESPONSE: NODE_RESPONSE,
             },
         )
 
-        # EXECUTE/PLANNER -> UNDERSTANDING (ReAct Loop)
-        workflow.add_edge(NODE_EXECUTE, NODE_UNDERSTANDING)
-        workflow.add_edge(NODE_PLANNER, NODE_UNDERSTANDING)
+        # EXECUTE -> RESPONSE (Linear Flow: Output is passed to Summarizer)
+        workflow.add_edge(NODE_EXECUTE, NODE_RESPONSE)
 
-        # Response node ends the flow
+        # RESPONSE -> END
         workflow.add_edge(NODE_RESPONSE, END)
 
         # Persistence
@@ -118,19 +111,15 @@ class NetworkAgentWorkflow:
         """Decide next node based on the tool selected by UnderstandingNode."""
         last_message = state["messages"][-1]
 
-        # 1. NEW LOGIC: If no tool calls, it's a direct conversational response -> END
+        # If no tool calls, it's a direct conversational response -> END
         if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
             return END
 
-        # 2. Handle Tool Calls
+        # Handle Tool Calls
         tool_name = last_message.tool_calls[0]["name"]
 
         if tool_name == TOOL_CONFIG_COMMAND:
             return NODE_APPROVAL
-        elif tool_name == TOOL_MULTI_COMMAND:
-            return NODE_PLANNER
-        elif tool_name == TOOL_FINAL_RESPONSE:
-            return NODE_RESPONSE  # Data formatting node
         else:
             return NODE_EXECUTE
 
@@ -138,9 +127,10 @@ class NetworkAgentWorkflow:
         from langchain_core.messages import ToolMessage
 
         last_message = state["messages"][-1]
-        # If user denied, we injected a ToolMessage with error, loop back to LLM to handle it
+        # If user denied, we injected a ToolMessage with error.
+        # In linear flow, we send this error to ResponseNode to be summarized/displayed.
         if isinstance(last_message, ToolMessage):
-            return NODE_UNDERSTANDING
+            return NODE_RESPONSE
         return NODE_EXECUTE
 
     def create_session_config(self, session_id: str) -> dict:

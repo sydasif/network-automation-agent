@@ -1,4 +1,4 @@
-"""Response node for formatting final output."""
+"""Response node for formatting final output using Structured Outputs."""
 
 import json
 from typing import Any
@@ -6,6 +6,8 @@ from typing import Any
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
+from agent.schemas import AgentResponse
+
 
 class ResponseNode(AgentNode):
     """Formats the final response by combining LLM summary with raw data."""
@@ -20,63 +22,49 @@ class ResponseNode(AgentNode):
                 user_query = msg.content
                 break
 
-        # 2. Extract Data (Fix for Multi-Tool Batches)
-        collected_data = [] # List to hold all found tool outputs
+        # 2. Extract Data from previous ExecuteNode steps
         last_tool_output_str = "No data found."
 
-        # Iterate backwards
+        # Iterate backwards to find tool outputs
         for msg in reversed(messages):
-            # Stop if we hit a HumanMessage or an AI message that ISN'T the final_response call
-            # This ensures we only grab the tool outputs that just happened.
             if isinstance(msg, HumanMessage):
                 break
-
             if isinstance(msg, ToolMessage):
-                # Ignore the routing signal tool
-                if msg.name == "final_response":
-                    continue
-
-                # Ignore error/denied messages
+                # Ignore error/denied messages if you wish
                 if msg.content.startswith("❌"):
+                    last_tool_output_str += f"\nError from {msg.name}: {msg.content}"
                     continue
+                last_tool_output_str += f"\nOutput from {msg.name}: {msg.content}"
 
-                # Process valid tool output
-                try:
-                    data = json.loads(msg.content)
-                    collected_data.append(data)
-                    # Keep the text version for the LLM prompt
-                    last_tool_output_str += f"\nOutput from {msg.name}: {msg.content}"
-                except:
-                    collected_data.append({"raw_text": msg.content})
-                    last_tool_output_str += f"\nOutput from {msg.name}: {msg.content}"
-
-        # 3. Merge Data for UI
-        # If we have multiple outputs (e.g., s1 and s2), we want to show them all.
-        merged_raw_data = None
-        if collected_data:
-            if len(collected_data) == 1:
-                merged_raw_data = collected_data[0]
-            else:
-                # Merge logic: Create a wrapper to hold multiple results
-                merged_raw_data = {"batch_results": collected_data}
-
-        # 4. Generate Summary
+        # 3. Generate Structured Response using Pydantic
         prompt = NetworkAgentPrompts.RESPONSE_PROMPT.invoke({
             "user_query": user_query,
-            "data": last_tool_output_str[:25000] # Increased limit slightly
+            "data": last_tool_output_str[:25000]
         })
 
-        response_msg = self._get_llm().invoke(prompt)
-        summary = response_msg.content
+        # Get the LLM and enforce the schema
+        llm = self._get_llm()
+        structured_llm = llm.with_structured_output(AgentResponse)
 
-        # 5. Construct Payload
-        final_payload = {
-            "message": summary,
-        }
+        try:
+            # This returns an instance of AgentResponse
+            response_model: AgentResponse = structured_llm.invoke(prompt)
 
-        if merged_raw_data:
-            final_payload["structured_data"] = merged_raw_data
+            # Convert back to dict for the UI/State
+            final_payload = response_model.model_dump(exclude_none=True)
 
-        return {
-            "messages": [AIMessage(content=json.dumps(final_payload))]
-        }
+            # Map 'summary' to 'message' to match what UI expects
+            final_payload["message"] = final_payload.pop("summary")
+
+            return {
+                "messages": [AIMessage(content=json.dumps(final_payload))]
+            }
+
+        except Exception as e:
+            # Fallback if strict parsing fails
+            return {
+                "messages": [AIMessage(content=json.dumps({
+                    "message": f"Error generating structured response: {str(e)}",
+                    "structured_data": {"raw": last_tool_output_str[:1000]}
+                }))]
+            }

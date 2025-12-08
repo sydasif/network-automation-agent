@@ -7,8 +7,6 @@ Tools can be added/removed by creating new tool classes and registering them her
 from core.task_executor import TaskExecutor
 from tools.base_tool import NetworkTool
 from tools.config_tool import ConfigCommandTool
-from tools.multi_command import MultiCommandTool
-from tools.response_tool import ResponseTool
 from tools.show_tool import ShowCommandTool
 
 
@@ -29,8 +27,6 @@ def create_tools(task_executor: TaskExecutor) -> list:
     tools = [
         ShowCommandTool(task_executor),
         ConfigCommandTool(task_executor),
-        MultiCommandTool(),
-        ResponseTool(),
     ]
 
     # Convert to LangChain tool format
@@ -41,7 +37,5 @@ __all__ = [
     "NetworkTool",
     "ShowCommandTool",
     "ConfigCommandTool",
-    "MultiCommandTool",
-    "ResponseTool",
     "create_tools",
 ]
