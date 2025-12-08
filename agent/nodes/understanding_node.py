@@ -8,6 +8,7 @@ from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
+from core.context_manager import ContextManager  # <--- Import
 
 logger = logging.getLogger(__name__)
 
@@ -31,25 +32,24 @@ class UnderstandingNode(AgentNode):
         messages = state.get("messages", [])
 
         # Check if the previous attempt failed (empty AI message)
-        # This acts as a self-correction loop
         if len(messages) > 1 and isinstance(messages[-1], AIMessage):
             last_msg = messages[-1]
             if not last_msg.content and not last_msg.tool_calls:
-                # Inject a hint to the LLM
-                messages.append(
-                    SystemMessage(
-                        content="Error: You returned an empty response. Please clarify the request or call a tool."
-                    )
-                )
+                messages.append(SystemMessage(content="Error: You returned an empty response. Please clarify the request or call a tool."))
 
-        # --- APPLY MEMORY MANAGEMENT ---
-        # Check against safety limits
-        if not self._llm_provider.check_safe_to_send(messages):
-            logger.warning(
-                "Message history exceeds safety limits. Truncating to last 10 messages."
-            )
-            messages = messages[-10:]
-        # -------------------------------
+        # --- APPLY SMART CONTEXT MANAGEMENT ---
+        # Instead of blindly slicing [-10:], we compress old outputs.
+        # This keeps the "story" alive for much longer (50+ turns) without hitting token limits.
+        context_messages = ContextManager.compress_history(
+            messages,
+            keep_last=6  # Keep last 3 turns (User-AI-Tool-AI-User...) fully intact
+        )
+
+        # Safety Net: If compression still isn't enough (extremely long session),
+        # force a hard limit on the total count to prevent 413 Errors.
+        if len(context_messages) > 40:
+             context_messages = context_messages[-40:]
+        # --------------------------------------
 
         # Get device inventory
         inventory_str = self._device_inventory.get_device_info()
@@ -58,7 +58,7 @@ class UnderstandingNode(AgentNode):
         prompt = NetworkAgentPrompts.UNDERSTAND_PROMPT.invoke(
             {
                 "device_inventory": inventory_str,
-                "messages": messages,
+                "messages": context_messages,
             }
         )
 
