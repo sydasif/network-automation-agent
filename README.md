@@ -1,60 +1,64 @@
 # Network Automation Agent 🤖
 
-An AI-powered network automation assistant that uses natural language to manage network devices. Built with **LangGraph** (ReAct Architecture), **Groq LLM** (Llama 3), and **Nornir**.
+An AI-powered network automation assistant that uses natural language to manage network devices. Built with **LangGraph**, **Groq (Llama 3.3)**, and **Nornir**.
 
 ## ✨ Features
 
-- **Cyclic ReAct Architecture**: The agent "Reasons" and "Acts" in a loop, allowing it to analyze command outputs and self-correct or chain multiple dependent tasks.
-- **Natural Language Interface**: Describe complex network intents in plain English (e.g., "Troubleshoot OSPF on R1").
+- **Linear Pipeline Architecture**: A deterministic "One-Shot" workflow (`Intent` → `Action` → `Summary`) that eliminates infinite loops and ensures predictable behavior.
+- **Natural Language Interface**: Describe intents in plain English (e.g., "Show interfaces on R1" or "Configure VLAN 10 on Switch 2").
+- **Structured Outputs**: Uses **Pydantic** to enforce strict data schemas, ensuring the AI produces clean Markdown summaries and structured JSON every time.
+- **Smart Context Management**: Intelligently compresses massive network outputs (like `show running-config`) to maintain long conversation history without hitting token limits.
 - **Human-in-the-Loop**: Critical configuration changes trigger an interrupt, requiring explicit user approval via CLI before execution.
 - **Multi-Vendor Support**: Works with Cisco IOS/XE, Arista EOS, Juniper Junos, etc. (via Netmiko/Nornir).
-- **Token Efficient**: Optimized XML-based prompts and memory middleware to minimize LLM costs and latency.
-- **State Persistence**: Uses SQLite to remember conversation context and execution history across sessions.
 
 ## 🏗️ Architecture
 
-The application follows a **modular, class-based architecture** orchestrated by a cyclic state graph:
+The application follows a **Linear Pipeline** design to ensure safety and reliability in network operations:
 
 ```mermaid
 graph TD
-    Start --> ContextManager
-    ContextManager --> Understanding
-    Understanding -->|Chat| End
-    Understanding -->|ReadOnly| Execute
-    Understanding -->|Config| Approval
+    Start --> Context[Context Manager]
+    Context --> Understand[Understanding Node]
+
+    Understand -->|Chat| End
+    Understand -->|Show Command| Execute[Execute Node]
+    Understand -->|Config Command| Approval[Approval Node]
+
     Approval -->|Approved| Execute
-    Approval -->|Denied| Understanding
-    Execute --> Understanding
+    Approval -->|Denied| Response[Response Node]
+
+    Execute --> Response
+    Response --> End
 ```
 
 ### Workflow Logic
 
-1. **Context Manager**: Loads conversation history and sanitizes it to fit token limits.
-2. **Understanding Node**: The "Brain". It analyzes user intent and selects the appropriate tool (`show`, `config`, or `plan`).
-3. **Approval Node**: Intercepts `config_command` calls. It pauses execution until the user types "yes". If denied, it feeds the error back to the Understanding node.
-4. **Execute Node**: Runs the Nornir tasks against live devices.
-5. **ReAct Loop**: The output of the execution is fed *back* into the Understanding node, allowing the AI to summarize results or decide on the next step.
+1. **Context Manager**: Compresses old tool outputs to save tokens while keeping the conversation flow intact.
+2. **Understanding Node**: Analyzes user intent and selects the appropriate tool (`show_command` or `config_command`).
+3. **Approval Node**: Intercepts state-changing commands. Pauses for user confirmation.
+4. **Execute Node**: Runs Nornir tasks against live devices and bundles the raw output.
+5. **Response Node**: Analyzes the raw execution data and generates a professional Markdown summary using strict Pydantic schemas.
 
 ### Package Structure
 
 ```text
 network-automation-agent/
 ├── agent/                  # AI Logic
-│   ├── workflow_manager.py # Graph definition
-│   ├── prompts.py          # XML-based system prompts
+│   ├── workflow_manager.py # Linear Graph definition
+│   ├── schemas.py          # Pydantic output models
+│   ├── prompts.py          # System prompts
 │   └── nodes/              # Workflow steps
 │       ├── understanding_node.py
 │       ├── execute_node.py
 │       ├── approval_node.py
-│       └── planner_node.py
+│       └── response_node.py
 ├── core/                   # Infrastructure
 │   ├── nornir_manager.py   # Device connectivity
-│   ├── task_executor.py    # Error handling wrapper
+│   ├── context_manager.py  # Token optimization
 │   └── llm_provider.py     # Groq client factory
 ├── tools/                  # Capabilities
 │   ├── show_tool.py        # Read-only commands
-│   ├── config_tool.py      # Config changes
-│   └── multi_command.py    # Planning logic
+│   └── config_tool.py      # Config changes
 ├── cli/                    # User Interface
 │   └── application.py      # App lifecycle
 └── ui/                     # Presentation
@@ -117,27 +121,15 @@ uv run python main.py --chat --debug
 
 ## 🧠 Key Concepts
 
-### ReAct Pattern vs Linear Chain
+### Linear vs Cyclic
 
-Unlike simple chatbots that go `Input -> LLM -> Tool -> Output`, this agent uses a **loop**.
-
-- *User*: "Fix BGP on R1"
-- *Agent*: Runs `show ip bgp summary`.
-- *Agent*: Sees neighbor is Idle. Decides to run `show run | s bgp`.
-- *Agent*: Sees wrong neighbor IP. Asks for `config` approval.
-- *Agent*: Applies fix. Verifies with `show ip bgp summary` again.
-- *Agent*: Reports "Fixed" to user.
-
-### Memory Middleware
-
-To prevent `413 Request Entity Too Large` errors when dealing with massive network outputs (like `show tech-support`), the `ContextManager` uses smart trimming strategies to keep the context window focused on the most recent relevant information.
+Unlike "ReAct" agents that loop until they decide to stop, this agent creates a **Single Execution Plan**. This prevents the AI from "thinking out loud" or hallucinating follow-up commands, making it safer for production networks.
 
 ### Safety First
 
-- **Validation**: Tools automatically validate that target devices exist in the inventory before execution.
-
+- **Validation**: Tools validate that target devices exist in the inventory before execution.
 - **Approval**: Any state-changing command (`config_command`) requires explicit user confirmation.
-- **Error Handling**: Netmiko exceptions (Timeout, Auth) are caught and presented to the LLM, allowing it to suggest troubleshooting steps (e.g., "Check firewall").
+- **Strict Parsing**: Output is parsed into `AgentResponse` objects, preventing malformed JSON errors.
 
 ## 🤝 Contributing
 
@@ -146,7 +138,3 @@ To prevent `413 Request Entity Too Large` errors when dealing with massive netwo
 3. Make your changes
 4. Ensure tests pass: `uv run pytest`
 5. Submit a pull request
-
----
-
-**Made with ❤️ for Network Engineers**

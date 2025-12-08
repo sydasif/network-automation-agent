@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2025-12-08
+
+### 🚀 Major Architecture Shift - Linear Pipeline
+
+#### Changed
+
+- **Workflow Architecture**: Migrated from Cyclic ReAct loop to **Linear Pipeline** (`Understanding` -> `Execute` -> `Response`).
+- **Output Handling**: Implemented **Pydantic Structured Outputs** for strict, type-safe JSON generation.
+- **Memory Management**: Replaced naive history slicing with **Smart Context Compression** in `core/context_manager.py`.
+- **UI Formatting**: Standardized on **Markdown** summaries with tables and headers.
+
+#### Removed
+
+- **Planner Node**: Removed complex planning logic (`agent/nodes/planner_node.py`).
+- **Multi-Command Tool**: Removed planning tool (`tools/multi_command.py`).
+- **Response Tool**: Removed explicit response triggering (`tools/response_tool.py`).
+- **Manual JSON Parsing**: Replaced regex-based parsing with `llm.with_structured_output`.
+
+#### Fixed
+
+- **Stability**: Fixed "Thinking out loud" crashes by removing the LLM's ability to loop back after execution.
+- **Token Limits**: Fixed "Goldfish Memory" issues in long sessions using context compression.
+
+---
+
 ## [2.0.0] - 2025-12-01
 
 ### 🎉 Major Refactoring - Class-Based Modular Architecture
@@ -104,5 +129,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Human-in-the-loop approval
 - Interactive and single command modes
 
+[2.1.0]: https://github.com/sydasif/network-automation-agent/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/sydasif/network-automation-agent/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/sydasif/network-automation-agent/releases/tag/v1.0.0
