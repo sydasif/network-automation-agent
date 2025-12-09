@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.json import JSON
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
@@ -136,24 +137,32 @@ class NetworkAgentUI:
     def print_output(self, content: str | dict):
         """Display the command output with clear separation."""
 
+        def render_content(text_content):
+            """Helper to render content inline with the label using a Grid."""
+            grid = Table.grid(padding=(0, 1))
+            grid.add_column(style="bold blue", no_wrap=True)
+            grid.add_column()  # Content column expands
+
+            # The Markdown class renders block elements, but inside a grid cell
+            # it aligns relatively well with the label.
+            grid.add_row(f"{Emoji.AI} AI >", Markdown(text_content))
+            self.console.print(grid)
+            self.console.print()  # Add spacing
+
         # 1. Handle string input (legacy)
         if isinstance(content, str):
             try:
                 content = json.loads(content)
             except json.JSONDecodeError:
-                # For plain strings, wrap in Markdown for proper table/header rendering
-                self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue]")
-                self.console.print(Markdown(content))
-                self.console.print()
+                # For plain strings, use the inline renderer
+                render_content(content)
                 return
 
         # 2. Handle Dictionary (The new standard)
         if isinstance(content, dict):
             # A. Print the conversational message (Summary)
             if "message" in content and content["message"]:
-                self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue]")
-                self.console.print(Markdown(content["message"]))
-                self.console.print()  # Add spacing
+                render_content(content["message"])
             elif "error" in content:
                 # Fallback if message is missing but error exists
                 self.console.print(f"[bold red]{Emoji.ERROR} Error:[/bold red] {content['error']}")
