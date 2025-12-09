@@ -22,8 +22,8 @@ class NetworkAgentConfig:
         "LLM_TEMPERATURE": (
             "llm_temperature",
             float,
-            0.7,
-        ),  # Changed to 0.7 to match test expectation
+            0.0,
+        ),  # Changed to 0.0 for deterministic output in Linear Pipeline
         "LLM_MAX_TOKENS": ("llm_max_tokens", int, 2048),
         "MAX_HISTORY_TOKENS": (
             "max_history_tokens",
@@ -43,7 +43,7 @@ class NetworkAgentConfig:
     # Configuration fields
     groq_api_key: str = None  # Will be validated separately
     llm_model_name: str = "openai/gpt-oss-120b"
-    llm_temperature: float = 0.7  # Changed from 0.0 to 0.7 to match test
+    llm_temperature: float = 0.0  # Changed from 0.7 to 0.0 for production precision
     llm_max_tokens: int = 2048
     max_history_tokens: int = 2000  # Changed back to 2000 to match original
     num_workers: int = 20
