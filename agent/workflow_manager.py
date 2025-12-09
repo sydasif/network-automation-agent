@@ -1,9 +1,9 @@
 """Workflow manager for the Network AI Agent with Persistence."""
 
 import logging
-import sqlite3
 
-from langgraph.checkpoint.sqlite import SqliteSaver
+# Changed: Use In-Memory checkpointer instead of SQLite
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import StateSnapshot
 
@@ -36,16 +36,13 @@ class NetworkAgentWorkflow:
         task_executor: TaskExecutor,
         tools: list,
         max_history_tokens: int = 3500,
-        db_path: str = ".agent_memory.db",
     ):
         self._llm_provider = llm_provider
         self._device_inventory = device_inventory
         self._task_executor = task_executor
         self._tools = tools
         self._max_history_tokens = max_history_tokens
-        self._db_path = db_path
         self._graph = None
-        self._conn = None
 
     def build(self):
         if self._graph is not None:
@@ -98,10 +95,9 @@ class NetworkAgentWorkflow:
         # RESPONSE -> END
         workflow.add_edge(NODE_RESPONSE, END)
 
-        # Persistence
-        logger.info(f"Initializing persistence at {self._db_path}")
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        checkpointer = SqliteSaver(self._conn)
+        # Persistence: Use In-Memory Checkpointer
+        logger.info("Initializing in-memory persistence")
+        checkpointer = MemorySaver()
 
         self._graph = workflow.compile(checkpointer=checkpointer)
 
@@ -143,5 +139,5 @@ class NetworkAgentWorkflow:
         return {"tool_calls": interrupt_value.get("tool_calls", [])}
 
     def close(self):
-        if self._conn:
-            self._conn.close()
+        # No DB connection to close anymore
+        pass
