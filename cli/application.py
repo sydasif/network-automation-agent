@@ -5,6 +5,7 @@ the entire application lifecycle and coordinates all components.
 """
 
 import logging
+import uuid
 from typing import Any
 
 from cli.bootstrapper import AppBootstrapper
@@ -50,8 +51,12 @@ class NetworkAgentCLI:
         Returns:
             Result dictionary from workflow execution
         """
+        # For single command, we generate a one-off session ID
+        # (Though orchestrator would generate one if we passed None, passing it explicitly is cleaner)
+        session_id = str(uuid.uuid4())
+
         # Use the orchestrator to execute the command
-        result = self.orchestrator.execute_command(command, device)
+        result = self.orchestrator.execute_command(command, device, session_id=session_id)
 
         # Print output if requested
         if print_output:
@@ -65,6 +70,10 @@ class NetworkAgentCLI:
         Args:
             device: Optional target device for all commands
         """
+        # Generate a persistent session ID for the entire chat session
+        # This ensures LangGraph memory (conversation history) is preserved between turns.
+        session_id = str(uuid.uuid4())
+
         # Print header
         self.components["ui"].print_header()
 
@@ -87,7 +96,8 @@ class NetworkAgentCLI:
                     continue
 
                 # Process command - orchestrator handles device context and approvals
-                result = self.orchestrator.execute_command(command, device)
+                # CRITICAL: Pass the persistent session_id here!
+                result = self.orchestrator.execute_command(command, device, session_id=session_id)
 
                 # Print result
                 self._print_result(result)

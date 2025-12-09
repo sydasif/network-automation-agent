@@ -1,13 +1,15 @@
 """Node functions for the network automation agent workflow."""
 
 import logging
+import uuid
 from typing import Any, Dict
 
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 
-from agent.constants import TOOL_CONFIG_COMMAND
+from agent.constants import TOOL_CONFIG_COMMAND, TOOL_SHOW_COMMAND
+from agent.schemas import ActionType, AgentResponse, ExecutionPlan
 from agent.state import RESUME_APPROVED
 
 logger = logging.getLogger(__name__)
@@ -63,33 +65,19 @@ def approval_node(state: Dict[str, Any]) -> Dict[str, Any] | None:
 def understanding_node(
     state: Dict[str, Any], llm_provider, device_inventory, tools: list
 ) -> Dict[str, Any]:
-    """Understands user intent and selects tools."""
-    from langchain_core.messages import SystemMessage
-
+    """Understands user intent and selects tools using the Planner Pattern."""
     from agent.prompts import NetworkAgentPrompts
     from core.message_manager import MessageManager
 
     messages = state.get("messages", [])
 
-    # Check if the previous attempt failed (empty AI message)
-    if len(messages) > 1 and isinstance(messages[-1], AIMessage):
-        last_msg = messages[-1]
-        if not last_msg.content and not getattr(last_msg, "tool_calls", None):
-            messages.append(
-                SystemMessage(
-                    content="Error: You returned an empty response. Please clarify the request or call a tool."
-                )
-            )
-
-    # Apply smart message management to keep context optimized
+    # 1. Message Management
     max_tokens = getattr(llm_provider._config, "max_history_tokens", 3500)
     message_manager = MessageManager(max_tokens=max_tokens, max_message_count=40)
     context_messages = message_manager.prepare_for_llm(messages)
 
-    # Get device inventory
+    # 2. Get Prompt
     inventory_str = device_inventory.get_device_info()
-
-    # Generate prompt
     prompt = NetworkAgentPrompts.UNDERSTAND_PROMPT.invoke(
         {
             "device_inventory": inventory_str,
@@ -97,17 +85,52 @@ def understanding_node(
         }
     )
 
-    # Get LLM with tools and invoke
-    llm_with_tools = llm_provider.get_llm_with_tools(tools)
-    response = llm_with_tools.invoke(prompt)
+    # 3. Invoke Planner (Structured Output)
+    llm = llm_provider.get_llm()
+    structured_llm = llm.with_structured_output(ExecutionPlan)
 
-    # Logging
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        logger.info(f"Generated {len(response.tool_calls)} tool calls")
-    else:
-        logger.info("Generated 0 tool calls")
+    try:
+        plan: ExecutionPlan = structured_llm.invoke(prompt)
+    except Exception as e:
+        logger.error(f"Planning failed: {e}")
+        return {"messages": [AIMessage(content="I'm sorry, I couldn't process that request.")]}
 
-    return {"messages": [response]}
+    # 4. Handle Direct Response (Chitchat/Questions) - NEW
+    if plan.direct_response:
+        logger.info("Planner generated a direct response (no tools)")
+        return {"messages": [AIMessage(content=plan.direct_response)]}
+
+    # 5. Convert Plan to Tool Calls (Deterministic Logic)
+    tool_calls = []
+
+    if not plan.steps:
+        # Fallback if both steps and response are empty
+        return {"messages": [AIMessage(content="How can I help you with your network?")]}
+
+    for step in plan.steps:
+        tool_name = ""
+        args = {}
+
+        if step.action_type == ActionType.READ:
+            tool_name = TOOL_SHOW_COMMAND
+            args = {"devices": [step.device], "command": step.command}
+        elif step.action_type == ActionType.CONFIGURE:
+            tool_name = TOOL_CONFIG_COMMAND
+            # Ensure config is a list
+            cmd_list = step.command.split("\n") if "\n" in step.command else [step.command]
+            args = {"devices": [step.device], "configs": cmd_list}
+
+        if tool_name:
+            tool_calls.append({
+                "name": tool_name,
+                "args": args,
+                "id": str(uuid.uuid4()),
+                "type": "tool_call",
+            })
+
+    logger.info(f"Planner generated {len(tool_calls)} tool calls")
+
+    return {"messages": [AIMessage(content="", tool_calls=tool_calls)]}
 
 
 def response_node(state: Dict[str, Any], llm_provider) -> Dict[str, Any]:
@@ -115,7 +138,6 @@ def response_node(state: Dict[str, Any], llm_provider) -> Dict[str, Any]:
     from langchain_core.messages import HumanMessage
 
     from agent.prompts import NetworkAgentPrompts
-    from agent.schemas import AgentResponse
 
     messages = state.get("messages", [])
     logger.info(f"ResponseNode executing. Message count: {len(messages)}")

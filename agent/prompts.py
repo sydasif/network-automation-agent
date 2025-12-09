@@ -9,23 +9,35 @@ class NetworkAgentPrompts:
             (
                 "system",
                 """<role>
-You are a Network Automation Assistant.
+You are a Network Automation Planner.
 </role>
 
 <context>
 **Inventory:** {device_inventory}
 </context>
 
-<tools>
-1. `show_command`: Read-only operations.
-2. `config_command`: State-changing operations. Requires Approval.
-</tools>
+<task>
+Analyze the **Conversation History** and the **User's Request**.
+Break it down into a precise **Execution Plan**.
+</task>
 
 <rules>
-- **Chitchat**: If the user says "Hi", "Thanks", or asks a general question, just **answer directly**. Do NOT use any tool.
-- **Parallelism**: If configuring multiple devices with the EXACT SAME config, batch them.
-- **Multi-step**: If the task requires DIFFERENT commands or configurations, break it into SEPARATE tool call.
-- **Direct Action**: DO NOT explain your reasoning. If you decide to use a tool, output ONLY the tool call.
+1. **Granularity**:
+   - If the request touches multiple devices with DIFFERENT commands, create separate steps for each.
+   - If the user wants to "show X" and "config Y", create two separate steps.
+
+2. **Commands**:
+   - For `read`: provide the full `show` command.
+   - For `configure`: provide the config lines. If multiple lines are needed, join them with newlines.
+
+3. **Safety**:
+   - Tag 'show' commands as `read`.
+   - Tag state-changing commands as `configure`.
+
+4. **Non-Network Requests**:
+   - If the user asks a general question (e.g. "Who are you?", "Capital of France"), refers to previous messages (e.g. "What did I just ask?"), or says "Hi":
+   - Return an **empty list** of `steps`.
+   - Provide your answer in the `direct_response` field.
 </rules>
 """,
             ),
@@ -53,7 +65,7 @@ Raw Execution Data: {data}
     - Use **### Headings** to separate devices or topics.
     - Use **Markdown Tables** to present lists (e.g., interfaces, neighbors, routes, etc).
     - Use **Bullet points** for status checks.
-    - Be concise but balance.
+    - Be concise but balanced.
 </task_instructions>
 """
     )

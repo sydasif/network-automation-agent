@@ -56,8 +56,11 @@ def test_run_single_command(mock_app):
 
     cli.run_single_command("show version", "R1")
 
-    # Verify orchestrator was called
-    mock_app["orchestrator"].execute_command.assert_called_once_with("show version", "R1")
+    # Verify orchestrator was called with session_id
+    call_args = mock_app["orchestrator"].execute_command.call_args
+    assert call_args[0] == ("show version", "R1")
+    assert "session_id" in call_args[1]
+    assert call_args[1]["session_id"] is not None
 
 
 def test_run_interactive_chat_exit(mock_app):
@@ -77,6 +80,12 @@ def test_run_interactive_chat_exit(mock_app):
 
         # Verify we tried to get input
         mock_ui.print_command_input_prompt.assert_called()
+
+        # Verify orchestrator was called with session_id
+        if cli.orchestrator.execute_command.called:
+            call_args = cli.orchestrator.execute_command.call_args
+            assert "session_id" in call_args[1]
+            assert call_args[1]["session_id"] is not None
 
 
 def test_cleanup(mock_app):

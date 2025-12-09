@@ -127,13 +127,15 @@ class NetworkAgentWorkflow:
         if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
             return END
 
-        # Handle Tool Calls
-        tool_name = last_message.tool_calls[0]["name"]
-
-        if tool_name == TOOL_CONFIG_COMMAND:
+        # Intelligent Batch Routing:
+        # Check ALL tool calls in the list.
+        # If ANY tool call is a config command, route to APPROVAL.
+        # Otherwise (all are show commands), route to EXECUTE.
+        tool_calls = last_message.tool_calls
+        if any(tc["name"] == TOOL_CONFIG_COMMAND for tc in tool_calls):
             return NODE_APPROVAL
-        else:
-            return NODE_EXECUTE
+
+        return NODE_EXECUTE
 
     def _route_approval(self, state: State) -> str:
         from langchain_core.messages import ToolMessage

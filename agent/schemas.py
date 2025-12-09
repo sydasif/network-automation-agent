@@ -1,6 +1,7 @@
 """Pydantic schemas for structured LLM outputs."""
 
-from typing import Any, Dict, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -23,4 +24,36 @@ class AgentResponse(BaseModel):
     error: Optional[str] = Field(
         default=None,
         description="If the execution failed, a user-friendly error message.",
+    )
+
+
+# --- New Planning Schemas ---
+
+class ActionType(str, Enum):
+    READ = "read"
+    CONFIGURE = "configure"
+
+
+class NetworkAction(BaseModel):
+    """A single logical action to perform on a device."""
+
+    action_type: ActionType = Field(
+        description="Type of action: 'read' for show commands, 'configure' for config changes."
+    )
+    device: str = Field(description="The target device hostname.")
+    command: str = Field(
+        description="The full CLI command (e.g. 'show ver' or 'interface eth1\\n ip address...')."
+    )
+
+
+class ExecutionPlan(BaseModel):
+    """The complete list of actions required to fulfill the user request."""
+
+    steps: List[NetworkAction] = Field(
+        default_factory=list,
+        description="A list of sequential steps. Leave empty if no network actions are needed."
+    )
+    direct_response: Optional[str] = Field(
+        default=None,
+        description="Use this field for general greetings, clarifications, or answers to non-network questions."
     )
