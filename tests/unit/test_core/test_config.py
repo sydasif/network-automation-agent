@@ -14,7 +14,7 @@ def test_config_load_defaults():
     with patch.dict(os.environ, {"GROQ_API_KEY": "test_key"}, clear=True):
         # Mock load_dotenv to prevent reading actual .env file
         with patch("core.config.load_dotenv"):
-            config = NetworkAgentConfig()
+            config = NetworkAgentConfig.from_env()
 
             assert config.groq_api_key == "test_key"
             assert config.llm_model_name == "openai/gpt-oss-120b"
@@ -35,7 +35,7 @@ def test_config_load_env_overrides():
 
     with patch.dict(os.environ, env_vars, clear=True):
         with patch("core.config.load_dotenv"):
-            config = NetworkAgentConfig()
+            config = NetworkAgentConfig.from_env()
 
             assert config.llm_model_name == "custom-model"
             assert config.llm_temperature == 0.5
@@ -48,7 +48,7 @@ def test_config_validation_missing_api_key():
     with patch.dict(os.environ, {}, clear=True):
         with patch("core.config.load_dotenv"):
             # Should not raise on init
-            config = NetworkAgentConfig()
+            config = NetworkAgentConfig.from_env()
 
             # Should raise RuntimeError on validate()
             with pytest.raises(
@@ -60,7 +60,7 @@ def test_config_validation_missing_api_key():
 def test_config_log_skip_modules():
     """Test parsing of log skip modules."""
     with patch.dict(os.environ, {"GROQ_API_KEY": "test_key"}, clear=True):
-        config = NetworkAgentConfig()
+        config = NetworkAgentConfig.from_env()
         # Check default list
         assert "httpcore" in config.log_skip_modules
         assert "httpx" in config.log_skip_modules

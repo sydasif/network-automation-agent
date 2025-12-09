@@ -1,6 +1,7 @@
 """Workflow manager for the Network AI Agent with Persistence."""
 
 import logging
+from functools import partial
 
 # Changed: Use In-Memory checkpointer instead of SQLite
 from langgraph.checkpoint.memory import MemorySaver
@@ -9,10 +10,16 @@ from langgraph.types import StateSnapshot
 
 from agent.constants import TOOL_CONFIG_COMMAND
 from agent.nodes import (
-    ApprovalNode,
-    ExecuteNode,
-    ResponseNode,
-    UnderstandingNode,
+    approval_node as approval_func,
+)
+from agent.nodes import (
+    execute_node as execute_func,
+)
+from agent.nodes import (
+    response_node as response_func,
+)
+from agent.nodes import (
+    understanding_node as understanding_func,
 )
 from agent.state import (
     NODE_APPROVAL,
@@ -48,21 +55,29 @@ class NetworkAgentWorkflow:
         if self._graph is not None:
             return self._graph
 
-        # Initialize Nodes
-        understand_node = UnderstandingNode(
-            self._llm_provider, self._device_inventory, self._tools
+        # Bind node functions with required parameters using functools.partial
+        understanding_with_deps = partial(
+            understanding_func,
+            llm_provider=self._llm_provider,
+            device_inventory=self._device_inventory,
+            tools=self._tools,
         )
-        approval_node = ApprovalNode(self._llm_provider)
-        execute_node = ExecuteNode(self._llm_provider, self._tools)
-        response_node = ResponseNode(self._llm_provider)
+        execute_with_deps = partial(
+            execute_func,
+            tools=self._tools,
+        )
+        response_with_deps = partial(
+            response_func,
+            llm_provider=self._llm_provider,
+        )
 
         workflow = StateGraph(State)
 
         # Add Nodes
-        workflow.add_node(NODE_UNDERSTANDING, understand_node.execute)
-        workflow.add_node(NODE_APPROVAL, approval_node.execute)
-        workflow.add_node(NODE_EXECUTE, execute_node.execute)
-        workflow.add_node(NODE_RESPONSE, response_node.execute)
+        workflow.add_node(NODE_UNDERSTANDING, understanding_with_deps)
+        workflow.add_node(NODE_APPROVAL, approval_func)
+        workflow.add_node(NODE_EXECUTE, execute_with_deps)
+        workflow.add_node(NODE_RESPONSE, response_with_deps)
 
         # Define Edges
         # START -> UNDERSTANDING
@@ -99,6 +114,7 @@ class NetworkAgentWorkflow:
         logger.info("Initializing in-memory persistence")
         checkpointer = MemorySaver()
 
+        # Compile without store (not needed with partial binding)
         self._graph = workflow.compile(checkpointer=checkpointer)
 
         return self._graph

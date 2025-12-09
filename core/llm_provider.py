@@ -10,6 +10,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_groq import ChatGroq
 
 from core.config import NetworkAgentConfig
+from core.message_manager import MessageManager
 from core.token_manager import TokenManager
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class LLMProvider:
         self._config = config
         self._primary_llm: BaseChatModel | None = None
         self._token_manager = TokenManager()
+        self._message_manager = MessageManager(max_tokens=self._config.max_history_tokens)
 
     def get_primary_llm(self) -> BaseChatModel:
         """Get Primary LLM instance (High Reasoning).
@@ -89,4 +91,8 @@ class LLMProvider:
         Returns:
             True if safe
         """
-        return self._token_manager.check_safe_to_send(messages)
+        # Prefer MessageManager's counting/logic if available
+        try:
+            return self._message_manager._is_token_safe(messages)
+        except Exception:
+            return self._token_manager.check_safe_to_send(messages)

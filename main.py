@@ -47,7 +47,7 @@ def main() -> None:
 
     try:
         # Initialize configuration and validate
-        config = NetworkAgentConfig()
+        config = NetworkAgentConfig.load()
         config.validate()
 
         # Create the CLI application

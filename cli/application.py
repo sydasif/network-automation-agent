@@ -5,22 +5,11 @@ the entire application lifecycle and coordinates all components.
 """
 
 import logging
-import uuid
 from typing import Any
 
-from langchain_core.messages import HumanMessage
-from langgraph.types import Command
-
-from agent import RESUME_APPROVED, RESUME_DENIED, NetworkAgentWorkflow
-from core import (
-    DeviceInventory,
-    LLMProvider,
-    NetworkAgentConfig,
-    NornirManager,
-    TaskExecutor,
-)
-from tools import create_tools
-from ui import NetworkAgentUI
+from cli.bootstrapper import AppBootstrapper
+from cli.orchestrator import WorkflowOrchestrator
+from core import NetworkAgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,38 +28,14 @@ class NetworkAgentCLI:
         Args:
             config: NetworkAgentConfig instance
         """
-        self._config = config
-        self._setup_dependencies()
-
-    def _setup_dependencies(self) -> None:
-        """Initialize all application dependencies.
-
-        This method creates all required components following the
-        dependency injection pattern.
-        """
-        logger.info("Initializing application dependencies...")
-
-        # Core infrastructure
-        self._nornir_manager = NornirManager(self._config)
-        self._device_inventory = DeviceInventory(self._nornir_manager)
-        self._task_executor = TaskExecutor(self._nornir_manager)
-        self._llm_provider = LLMProvider(self._config)
-
-        # Tools
-        self._tools = create_tools(self._task_executor)
-
-        # Workflow
-        self._workflow = NetworkAgentWorkflow(
-            llm_provider=self._llm_provider,
-            device_inventory=self._device_inventory,
-            task_executor=self._task_executor,
-            tools=self._tools,
-            max_history_tokens=self._config.max_history_tokens,
+        self.config = config
+        self.bootstrapper = AppBootstrapper(config)
+        self.components = self.bootstrapper.build_app()
+        self.orchestrator = WorkflowOrchestrator(
+            workflow=self.components["workflow"],
+            ui=self.components["ui"],
+            config=config,
         )
-        self._graph = self._workflow.build()
-
-        # UI
-        self._ui = NetworkAgentUI()
 
     def run_single_command(
         self, command: str, device: str | None = None, print_output: bool = True
@@ -85,25 +50,8 @@ class NetworkAgentCLI:
         Returns:
             Result dictionary from workflow execution
         """
-        # Generate unique session ID
-        session_id = str(uuid.uuid4())
-        config = self._workflow.create_session_config(session_id)
-
-        # Add device context if specified
-        if device:
-            full_command = f"{command} on device {device}"
-        else:
-            full_command = command
-
-        # Prepare user input
-        user_input = f"Run command '{full_command}'"
-
-        # Invoke workflow
-        with self._ui.thinking_status("Agent is working..."):
-            result = self._graph.invoke({"messages": [HumanMessage(content=user_input)]}, config)
-
-        # Handle approval requests
-        result = self._handle_approvals(config, result)
+        # Use the orchestrator to execute the command
+        result = self.orchestrator.execute_command(command, device)
 
         # Print output if requested
         if print_output:
@@ -117,120 +65,90 @@ class NetworkAgentCLI:
         Args:
             device: Optional target device for all commands
         """
-        # Generate session ID
-        session_id = str(uuid.uuid4())
-        config = self._workflow.create_session_config(session_id)
-
         # Print header
-        self._ui.print_header()
+        self.components["ui"].print_header()
 
         while True:
             try:
                 # Get command from user
-                command = self._ui.print_command_input_prompt()
+                command = self.components["ui"].print_command_input_prompt()
 
                 # Check for exit commands
                 if command.lower() in ["exit", "quit", "q", "/exit", "/quit", "/q"]:
-                    self._ui.print_goodbye()
+                    self.components["ui"].print_goodbye()
                     break
 
                 # Handle slash commands
                 if command.lower() == "/clear":
-                    self._ui.console.clear()
+                    self.components["ui"].console.clear()
                     continue
 
                 if not command:
                     continue
 
-                # Add device context if specified
-                if device:
-                    full_command = f"{command} on device {device}"
-                else:
-                    full_command = command
-
-                # Process command
-                result = self._process_interactive_command(full_command, config)
+                # Process command - orchestrator handles device context and approvals
+                result = self.orchestrator.execute_command(command, device)
 
                 # Print result
                 self._print_result(result)
 
             except KeyboardInterrupt:
-                self._ui.print_session_interruption()
+                self.components["ui"].print_session_interruption()
                 break
             except EOFError:
-                self._ui.print_session_interruption()
+                self.components["ui"].print_session_interruption()
                 break
             except Exception as e:
-                self._ui.print_error(f"Error processing command: {e}")
+                self.components["ui"].print_error(f"Error processing command: {e}")
                 logger.exception("Unexpected error in interactive chat")
 
-    def _process_interactive_command(self, command: str, config: dict) -> dict[str, Any]:
-        """Process a single command in interactive mode.
-
-        Args:
-            command: The command to process
-            config: Session configuration
-
-        Returns:
-            Result dictionary from workflow execution
-        """
-        # Invoke workflow
-        with self._ui.thinking_status("Agent is working..."):
-            result = self._graph.invoke({"messages": [HumanMessage(content=command)]}, config)
-
-        # Handle approval requests
-        result = self._handle_approvals(config, result)
-
-        return result
-
-    def _handle_approvals(self, config: dict, result: dict) -> dict:
-        """Handle approval requests in the workflow."""
-        snapshot = self._graph.get_state(config)
-
-        # Loop to handle approval requests
-        while approval_data := self._workflow.get_approval_request(snapshot):
-            # Extract tool calls list
-            tool_calls = approval_data.get("tool_calls", [])
-
-            if tool_calls:
-                self._ui.print_approval_request(tool_calls)
-                choice = self._ui.get_approval_decision()
-
-                resume_value = RESUME_APPROVED if choice in ["yes", "y"] else RESUME_DENIED
-
-                # Resume workflow
-                with self._ui.thinking_status("Resuming workflow..."):
-                    result = self._graph.invoke(Command(resume=resume_value), config)
-
-            # Update snapshot
-            snapshot = self._graph.get_state(config)
-
-        return result
-
-    def _print_result(self, result: dict) -> None:
+    def _print_result(self, result: Any) -> None:
         """Print workflow result to user.
 
         Args:
-            result: Workflow result dictionary
+            result: Workflow result (could be state snapshot or dict)
         """
-        if "messages" not in result or not result["messages"]:
+        # Extract messages from result - the structure depends on what was returned
+        messages = []
+        if (
+            hasattr(result, "values")
+            and isinstance(result.values, dict)
+            and "messages" in result.values
+        ):
+            messages = result.values["messages"]
+        elif isinstance(result, dict) and "messages" in result:
+            messages = result["messages"]
+        elif hasattr(result, "messages"):
+            messages = result.messages
+        elif hasattr(result, "__getitem__") and "messages" in result:
+            # result might be a dictionary-like object
+            messages = result["messages"]
+
+        if not messages:
             return
 
-        last_msg = result["messages"][-1]
+        last_msg = messages[-1]
 
         # Check for final_response tool call
         if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
             for tool_call in last_msg.tool_calls:
                 if tool_call["name"] == "final_response":
-                    self._ui.print_output(tool_call["args"])
+                    self.components["ui"].print_output(tool_call["args"])
                     return
 
-        # Fallback: print message content
-        if last_msg.content:
-            self._ui.print_output(last_msg.content)
+        # Fallback: prefer structured artifact if present, else print message content
+        artifact = getattr(last_msg, "artifact", None)
+        if artifact:
+            self.components["ui"].print_output(artifact, getattr(last_msg, "metadata", None))
+            return
+
+        if hasattr(last_msg, "content") and last_msg.content:
+            # Pass metadata if it exists
+            metadata = getattr(last_msg, "metadata", None)
+            self.components["ui"].print_output(last_msg.content, metadata)
 
     def cleanup(self) -> None:
         """Cleanup resources before shutdown."""
         logger.info("Cleaning up application resources...")
-        self._nornir_manager.close()
-        self._workflow.close()  # Close the workflow to clean up DB connection
+        self.components["nornir"].close()
+        # Workflow uses in-memory persistence, no additional cleanup required

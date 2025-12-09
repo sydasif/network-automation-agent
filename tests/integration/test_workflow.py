@@ -74,6 +74,13 @@ def test_workflow_show_command(mock_infrastructure):
         final_response_msg,  # Second call (Understand -> Output)
     ]
 
+    # Setup structured LLM for response node
+    mock_structured_llm = MagicMock()
+    mock_response_model = MagicMock()
+    mock_response_model.model_dump.return_value = {"message": "R1 is running Version 1.0"}
+    mock_structured_llm.invoke.return_value = mock_response_model
+    mock_llm.with_structured_output.return_value = mock_structured_llm
+
     # Setup TaskExecutor response
     task_executor.execute_task.return_value = {"R1": "Cisco IOS Version 1.0"}
 
@@ -117,6 +124,15 @@ def test_workflow_config_approval(mock_infrastructure):
     mock_llm = MagicMock()
     llm_provider.get_llm.return_value = mock_llm
     llm_provider.get_llm_with_tools.return_value = mock_llm
+
+    # Setup structured LLM for response node
+    mock_structured_llm = MagicMock()
+    mock_response_model = MagicMock()
+    mock_response_model.model_dump.return_value = {
+        "message": "Configuration applied successfully to R1"
+    }
+    mock_structured_llm.invoke.return_value = mock_response_model
+    mock_llm.with_structured_output.return_value = mock_structured_llm
 
     # LLM Responses
     tool_call_msg = AIMessage(

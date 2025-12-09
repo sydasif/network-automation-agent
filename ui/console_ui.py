@@ -134,8 +134,10 @@ class NetworkAgentUI:
         pattern = r"(?m)^(\s*[-*]\s+)([^:\n*]+)(:)"
         return re.sub(pattern, r"\1**\2**\3", text)
 
-    def print_output(self, content: str | dict):
+    def print_output(self, content, metadata=None):
         """Display the command output with clear separation."""
+
+        metadata = metadata or {}
 
         def render_content(text_content):
             """Helper to render content inline with the label using a Grid."""
@@ -149,16 +151,7 @@ class NetworkAgentUI:
             self.console.print(grid)
             self.console.print()  # Add spacing
 
-        # 1. Handle string input (legacy)
-        if isinstance(content, str):
-            try:
-                content = json.loads(content)
-            except json.JSONDecodeError:
-                # For plain strings, use the inline renderer
-                render_content(content)
-                return
-
-        # 2. Handle Dictionary (The new standard)
+        # Handle structured data as dictionary (new standard)
         if isinstance(content, dict):
             # A. Print the conversational message (Summary)
             if "message" in content and content["message"]:
@@ -175,6 +168,38 @@ class NetworkAgentUI:
                 self.console.print(f"[bold blue]{Emoji.AI} AI (Raw Output) >[/bold blue]")
                 self.console.print(JSON.from_data(content))
                 self.console.print()
+        # Handle string content
+        elif isinstance(content, str):
+            # Check if this is structured response type (from response node with metadata)
+            if metadata.get("type") == "structured_response":
+                try:
+                    parsed_content = json.loads(content)
+                    # If it's a structured response, handle as dict
+                    if isinstance(parsed_content, dict):
+                        if "message" in parsed_content and parsed_content["message"]:
+                            render_content(parsed_content["message"])
+                        elif "error" in parsed_content:
+                            self.console.print(
+                                f"[bold red]{Emoji.ERROR} Error:[/bold red] {parsed_content['error']}"
+                            )
+                            self.console.print()
+                        elif not parsed_content:
+                            pass
+                        else:
+                            self.console.print(
+                                f"[bold blue]{Emoji.AI} AI (Raw Output) >[/bold blue]"
+                            )
+                            self.console.print(JSON.from_data(parsed_content))
+                            self.console.print()
+                        return
+                except json.JSONDecodeError:
+                    pass
+
+            # For regular strings or if JSON parsing failed, use the inline renderer
+            render_content(content)
+        else:
+            # Handle other types by converting to string
+            render_content(str(content))
 
     def print_logging_separator(self):
         """Print a separator specifically for logging messages."""

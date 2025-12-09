@@ -1,11 +1,11 @@
-"""Unit tests for UnderstandingNode."""
+"""Unit tests for understanding_node function."""
 
 from unittest.mock import Mock
 
 import pytest
 from langchain_core.messages import HumanMessage
 
-from agent.nodes.understanding_node import UnderstandingNode
+from agent.nodes import understanding_node as understanding_func
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 
@@ -24,35 +24,13 @@ def device_inventory():
     return Mock(spec=DeviceInventory)
 
 
-@pytest.fixture
-def understanding_node(llm_provider, device_inventory):
+def test_understanding_node_function_with_dependencies(llm_provider, device_inventory):
+    """Test understanding_node function with dependencies."""
     mock_tool = Mock()
     mock_tool.name = "test_tool"
     mock_tool.description = "A test tool"
     tools = [mock_tool]
-    return UnderstandingNode(llm_provider, device_inventory, tools)
 
-
-def test_understanding_node_initialization(llm_provider, device_inventory):
-    """Test UnderstandingNode initialization."""
-    mock_tool = Mock()
-    mock_tool.name = "test_tool"
-    tools = [mock_tool]
-
-    # Properly mock the config for the LLM provider
-    mock_config = Mock()
-    mock_config.max_history_tokens = 1500
-    llm_provider._config = mock_config
-
-    node = UnderstandingNode(llm_provider, device_inventory, tools)
-
-    assert node._device_inventory == device_inventory
-    assert node._tools == tools
-    assert node._llm_provider == llm_provider
-
-
-def test_understanding_node_execute(understanding_node):
-    """Test UnderstandingNode execute method."""
     messages = [HumanMessage(content="Show me the status of router1")]
     state = {"messages": messages}
 
@@ -62,10 +40,12 @@ def test_understanding_node_execute(understanding_node):
     mock_llm = Mock()
     mock_llm.invoke.return_value = mock_response
 
-    # Patch _get_llm_with_tools to return our mock LLM
-    understanding_node._get_llm_with_tools = Mock(return_value=mock_llm)
+    # Mock LLM provider's method
+    llm_provider.get_llm_with_tools = Mock(return_value=mock_llm)
 
-    result = understanding_node.execute(state)
+    result = understanding_func(
+        state=state, llm_provider=llm_provider, device_inventory=device_inventory, tools=tools
+    )
 
     assert "messages" in result
     # The result should contain a message from the LLM with tools
