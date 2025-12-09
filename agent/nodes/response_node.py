@@ -5,11 +5,13 @@ import logging
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+
 from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
 from agent.schemas import AgentResponse
 
 logger = logging.getLogger(__name__)
+
 
 class ResponseNode(AgentNode):
     """Formats the final response by combining LLM summary with raw data."""
@@ -45,10 +47,9 @@ class ResponseNode(AgentNode):
             logger.warning("ResponseNode ran but found no tool outputs in recent history.")
 
         # 3. Generate Structured Response using Pydantic
-        prompt = NetworkAgentPrompts.RESPONSE_PROMPT.invoke({
-            "user_query": user_query,
-            "data": last_tool_output_str[:25000]
-        })
+        prompt = NetworkAgentPrompts.RESPONSE_PROMPT.invoke(
+            {"user_query": user_query, "data": last_tool_output_str[:25000]}
+        )
 
         # Get the LLM and enforce the schema
         llm = self._get_llm()
@@ -61,7 +62,7 @@ class ResponseNode(AgentNode):
             response_model: AgentResponse = structured_llm.invoke(prompt)
 
             # Check if response_model is actually an AgentResponse instance or a mock
-            if hasattr(response_model, 'model_dump'):
+            if hasattr(response_model, "model_dump"):
                 # Convert back to dict for the UI/State
                 final_payload = response_model.model_dump(exclude_none=True)
 
@@ -76,17 +77,15 @@ class ResponseNode(AgentNode):
                 logger.warning("Response model doesn't have model_dump method, using fallback")
                 final_payload = {
                     "message": "Response generated successfully",
-                    "structured_data": None
+                    "structured_data": None,
                 }
 
         except Exception as e:
             logger.error(f"Error generating structured response: {e}")
             final_payload = {
                 "message": f"Error generating structured response: {str(e)}",
-                "structured_data": {"raw": last_tool_output_str[:1000]}
+                "structured_data": {"raw": last_tool_output_str[:1000]},
             }
 
         logger.info("Response generated successfully.")
-        return {
-            "messages": [AIMessage(content=json.dumps(final_payload))]
-        }
+        return {"messages": [AIMessage(content=json.dumps(final_payload))]}

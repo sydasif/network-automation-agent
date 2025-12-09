@@ -152,8 +152,8 @@ class NetworkAgentUI:
             # A. Print the conversational message (Summary)
             if "message" in content and content["message"]:
                 self.console.print(f"[bold blue]{Emoji.AI} AI >[/bold blue]")
-                self.console.print(Markdown(content['message']))
-                self.console.print() # Add spacing
+                self.console.print(Markdown(content["message"]))
+                self.console.print()  # Add spacing
             elif "error" in content:
                 # Fallback if message is missing but error exists
                 self.console.print(f"[bold red]{Emoji.ERROR} Error:[/bold red] {content['error']}")

@@ -1,6 +1,7 @@
 """Pydantic schemas for structured LLM outputs."""
 
 from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
 

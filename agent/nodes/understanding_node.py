@@ -2,13 +2,14 @@
 
 import logging
 from typing import Any
+
 from langchain_core.messages import AIMessage, SystemMessage
 
 from agent.nodes.base_node import AgentNode
 from agent.prompts import NetworkAgentPrompts
+from core.context_manager import ContextManager  # <--- Import
 from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
-from core.context_manager import ContextManager  # <--- Import
 
 logger = logging.getLogger(__name__)
 
@@ -35,20 +36,24 @@ class UnderstandingNode(AgentNode):
         if len(messages) > 1 and isinstance(messages[-1], AIMessage):
             last_msg = messages[-1]
             if not last_msg.content and not last_msg.tool_calls:
-                messages.append(SystemMessage(content="Error: You returned an empty response. Please clarify the request or call a tool."))
+                messages.append(
+                    SystemMessage(
+                        content="Error: You returned an empty response. Please clarify the request or call a tool."
+                    )
+                )
 
         # --- APPLY SMART CONTEXT MANAGEMENT ---
         # Instead of blindly slicing [-10:], we compress old outputs.
         # This keeps the "story" alive for much longer (50+ turns) without hitting token limits.
         context_messages = ContextManager.compress_history(
             messages,
-            keep_last=6  # Keep last 3 turns (User-AI-Tool-AI-User...) fully intact
+            keep_last=6,  # Keep last 3 turns (User-AI-Tool-AI-User...) fully intact
         )
 
         # Safety Net: If compression still isn't enough (extremely long session),
         # force a hard limit on the total count to prevent 413 Errors.
         if len(context_messages) > 40:
-             context_messages = context_messages[-40:]
+            context_messages = context_messages[-40:]
         # --------------------------------------
 
         # Get device inventory

@@ -71,7 +71,7 @@ def get_structured_response(
         prompt: Prompt to send to LLM
         schema: Pydantic model to validate response against
         json_instruction: Optional custom JSON format instruction.
-                         If None, uses a default based on schema.
+        If None, uses a default based on schema.
 
     Returns:
         Validated Pydantic model instance

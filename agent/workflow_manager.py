@@ -11,14 +11,14 @@ from agent.constants import TOOL_CONFIG_COMMAND
 from agent.nodes import (
     ApprovalNode,
     ExecuteNode,
-    UnderstandingNode,
     ResponseNode,
+    UnderstandingNode,
 )
 from agent.state import (
     NODE_APPROVAL,
     NODE_EXECUTE,
-    NODE_UNDERSTANDING,
     NODE_RESPONSE,
+    NODE_UNDERSTANDING,
     State,
 )
 from core.device_inventory import DeviceInventory

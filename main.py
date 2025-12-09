@@ -1,10 +1,7 @@
-"""Network AI Agent CLI entry point.
-
+"""
 This module provides a command-line interface for the Network AI Agent,
 allowing users to execute network commands and configurations via natural language.
 Supports both single command execution and interactive chat mode.
-
-This is the NEW modular entry point using class-based architecture.
 """
 
 import argparse

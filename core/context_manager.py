@@ -1,25 +1,23 @@
 """Context management for optimizing LLM token usage."""
 
 from typing import List
+
 from langchain_core.messages import (
     BaseMessage,
-    HumanMessage,
-    AIMessage,
-    ToolMessage,
     SystemMessage,
+    ToolMessage,
 )
+
 
 class ContextManager:
     """Manages the conversation context to fit within token limits."""
 
     @staticmethod
     def compress_history(
-        messages: List[BaseMessage], 
-        keep_last: int = 6, 
-        max_tool_output: int = 100
+        messages: List[BaseMessage], keep_last: int = 6, max_tool_output: int = 100
     ) -> List[BaseMessage]:
         """Compress older messages while preserving the most recent context.
-        
+
         Strategy:
         1. Always keep SystemMessages.
         2. Keep the last `keep_last` messages fully intact.
@@ -37,7 +35,7 @@ class ContextManager:
         # 2. Split into "Old" and "Recent"
         if len(other_msgs) <= keep_last:
             return system_msgs + other_msgs
-            
+
         recent_msgs = other_msgs[-keep_last:]
         old_msgs = other_msgs[:-keep_last]
 
@@ -57,7 +55,7 @@ class ContextManager:
                         content=new_content,
                         tool_call_id=msg.tool_call_id,
                         name=msg.name,
-                        status=msg.status
+                        status=msg.status,
                     )
                     compressed_old.append(compressed_msg)
                 else:
