@@ -34,14 +34,17 @@ def test_understanding_node_function_with_dependencies(llm_provider, device_inve
     messages = [HumanMessage(content="Show me the status of router1")]
     state = {"messages": messages}
 
-    # Mock the LLM and its response
-    mock_response = Mock()
-    mock_response.tool_calls = []
+    # Mock the LLM and its structured output
+    mock_execution_plan = Mock()
+    mock_execution_plan.direct_response = "Router1 is running normally"
+    mock_execution_plan.steps = []
+    mock_structured_llm = Mock()
+    mock_structured_llm.invoke.return_value = mock_execution_plan
     mock_llm = Mock()
-    mock_llm.invoke.return_value = mock_response
+    mock_llm.with_structured_output.return_value = mock_structured_llm
 
     # Mock LLM provider's method
-    llm_provider.get_llm_with_tools = Mock(return_value=mock_llm)
+    llm_provider.get_llm = Mock(return_value=mock_llm)
 
     result = understanding_func(
         state=state, llm_provider=llm_provider, device_inventory=device_inventory, tools=tools

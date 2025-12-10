@@ -50,36 +50,32 @@ def test_workflow_show_command(mock_infrastructure):
     # Setup LLM responses
     mock_llm = MagicMock()
     llm_provider.get_llm.return_value = mock_llm
-    llm_provider.get_llm_with_tools.return_value = mock_llm
 
-    # Sequence of LLM responses:
-    # 1. UnderstandNode: Calls show_command tool
-    # 2. UnderstandNode (after tool): Formats final response
-
-    tool_call_msg = AIMessage(
-        content="",
-        tool_calls=[
-            {
-                "name": "show_command",
-                "args": {"devices": ["R1"], "command": "show version"},
-                "id": "call_1",
-            }
-        ],
-    )
-
-    final_response_msg = AIMessage(content="R1 is running Version 1.0")
-
-    mock_llm.invoke.side_effect = [
-        tool_call_msg,  # First call (Understand -> Tool)
-        final_response_msg,  # Second call (Understand -> Output)
+    # Mock structured output for ExecutionPlan
+    mock_execution_plan = MagicMock()
+    mock_execution_plan.direct_response = None  # No direct response, will execute steps
+    mock_execution_plan.steps = [
+        MagicMock(
+            action_type="read",
+            device="R1",
+            command="show version"
+        )
     ]
+    mock_structured_llm = MagicMock()
+    mock_structured_llm.invoke.return_value = mock_execution_plan
+    mock_llm.with_structured_output.return_value = mock_structured_llm
 
     # Setup structured LLM for response node
-    mock_structured_llm = MagicMock()
     mock_response_model = MagicMock()
     mock_response_model.model_dump.return_value = {"message": "R1 is running Version 1.0"}
-    mock_structured_llm.invoke.return_value = mock_response_model
-    mock_llm.with_structured_output.return_value = mock_structured_llm
+    mock_response_structured_llm = MagicMock()
+    mock_response_structured_llm.invoke.return_value = mock_response_model
+    # The response node also uses with_structured_output but for AgentResponse
+    def side_effect(schema):
+        if schema.__name__ == "AgentResponse":
+            return mock_response_structured_llm
+        return mock_structured_llm
+    mock_llm.with_structured_output.side_effect = side_effect
 
     # Setup TaskExecutor response
     task_executor.execute_task.return_value = {"R1": "Cisco IOS Version 1.0"}
@@ -123,38 +119,35 @@ def test_workflow_config_approval(mock_infrastructure):
 
     mock_llm = MagicMock()
     llm_provider.get_llm.return_value = mock_llm
-    llm_provider.get_llm_with_tools.return_value = mock_llm
+    # llm_provider.get_llm_with_tools.return_value = mock_llm  # Not needed with new Planner
+
+    # Mock structured output for ExecutionPlan
+    mock_execution_plan = MagicMock()
+    mock_execution_plan.direct_response = None  # No direct response, will execute steps
+    mock_execution_plan.steps = [
+        MagicMock(
+            action_type="configure",
+            device="R1",
+            command="int lo0\nip addr 1.1.1.1 255.255.255.255"
+        )
+    ]
+    mock_structured_llm = MagicMock()
+    mock_structured_llm.invoke.return_value = mock_execution_plan
+    mock_llm.with_structured_output.return_value = mock_structured_llm
 
     # Setup structured LLM for response node
-    mock_structured_llm = MagicMock()
     mock_response_model = MagicMock()
     mock_response_model.model_dump.return_value = {
         "message": "Configuration applied successfully to R1"
     }
-    mock_structured_llm.invoke.return_value = mock_response_model
-    mock_llm.with_structured_output.return_value = mock_structured_llm
-
-    # LLM Responses
-    tool_call_msg = AIMessage(
-        content="",
-        tool_calls=[
-            {
-                "name": "config_command",
-                "args": {
-                    "devices": ["R1"],
-                    "configs": ["int lo0", "ip addr 1.1.1.1 255.255.255.255"],
-                },
-                "id": "call_1",
-            }
-        ],
-    )
-
-    final_response_msg = AIMessage(content="Configuration applied successfully to R1")
-
-    mock_llm.invoke.side_effect = [
-        tool_call_msg,  # First call
-        final_response_msg,  # Second call
-    ]
+    mock_response_structured_llm = MagicMock()
+    mock_response_structured_llm.invoke.return_value = mock_response_model
+    # The response node also uses with_structured_output but for AgentResponse
+    def side_effect(schema):
+        if schema.__name__ == "AgentResponse":
+            return mock_response_structured_llm
+        return mock_structured_llm
+    mock_llm.with_structured_output.side_effect = side_effect
 
     # Setup TaskExecutor response for config command
     task_executor.execute_task.return_value = {"R1": "Configuration applied"}
