@@ -29,6 +29,7 @@ class AgentResponse(BaseModel):
 
 # --- New Planning Schemas ---
 
+
 class ActionType(str, Enum):
     READ = "read"
     CONFIGURE = "configure"
@@ -51,9 +52,9 @@ class ExecutionPlan(BaseModel):
 
     steps: List[NetworkAction] = Field(
         default_factory=list,
-        description="A list of sequential steps. Leave empty if no network actions are needed."
+        description="A list of sequential steps. Leave empty if no network actions are needed.",
     )
     direct_response: Optional[str] = Field(
         default=None,
-        description="Use this field for general greetings, clarifications, or answers to non-network questions."
+        description="Use this field for general greetings, clarifications, or answers to non-network questions.",
     )

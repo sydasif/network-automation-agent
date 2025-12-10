@@ -121,12 +121,14 @@ def understanding_node(
             args = {"devices": [step.device], "configs": cmd_list}
 
         if tool_name:
-            tool_calls.append({
-                "name": tool_name,
-                "args": args,
-                "id": str(uuid.uuid4()),
-                "type": "tool_call",
-            })
+            tool_calls.append(
+                {
+                    "name": tool_name,
+                    "args": args,
+                    "id": str(uuid.uuid4()),
+                    "type": "tool_call",
+                }
+            )
 
     logger.info(f"Planner generated {len(tool_calls)} tool calls")
 

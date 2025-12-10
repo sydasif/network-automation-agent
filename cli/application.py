@@ -159,6 +159,6 @@ class NetworkAgentCLI:
 
     def cleanup(self) -> None:
         """Cleanup resources before shutdown."""
-        logger.info("Cleaning up application resources...")
+        # logger.info("Cleaning up application resources...") # Removed as per user request
         self.components["nornir"].close()
         # Workflow uses in-memory persistence, no additional cleanup required

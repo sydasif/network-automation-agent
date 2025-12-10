@@ -7,6 +7,7 @@ between logging, input, and output using color coding and visual boundaries.
 import json
 import logging
 import re
+from typing import ContextManager
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
@@ -14,6 +15,7 @@ from rich.console import Console
 from rich.json import JSON
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.status import Status  # Import Status type
 from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
@@ -27,15 +29,16 @@ class Emoji:
     SUCCESS = "✅"
     ERROR = "❌"
     WARNING = "⚠️"
-    INFO = "ℹ️"
+    INFO = ""
     DEBUG = "🔍"
 
     # Actions
     ROCKET = "🚀"
     GEAR = "⚙️"
     WRENCH = "🔧"
-    THINKING = "🤔"
-    EXECUTING = "▶️"
+    THINKING = ""
+    EXECUTING = "🌐"
+    WRITE = "📝"  # Added for Response Node
 
     # Network specific
     NETWORK = "🌐"
@@ -250,8 +253,11 @@ class NetworkAgentUI:
         ]
         return self.session.prompt(message).strip().lower()
 
-    def thinking_status(self, message: str = "Thinking..."):
-        """Return a status spinner context manager."""
+    def thinking_status(self, message: str = "Thinking...") -> ContextManager[Status]:
+        """Return a status spinner context manager.
+
+        The returned object is a rich.status.Status which supports .update(text="new text").
+        """
         return self.console.status(
             f"[bold green]{Emoji.THINKING} {message}[/bold green]", spinner="dots"
         )
@@ -344,4 +350,8 @@ def setup_colored_logging():
     # Add handler to root logger
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
+
+    # Suppress INFO messages from nornir.core to remove 'Running task close_connections_task'
+    logging.getLogger("nornir.core").setLevel(logging.WARNING)
+
     return handler
