@@ -37,13 +37,30 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # Setup logging
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    setup_logging(level=log_level)
-    setup_colored_logging()
+    # Determine logging levels
+    # File logging: Always detailed (INFO or DEBUG)
+    file_log_level = logging.DEBUG if args.debug else logging.INFO
 
-    # Prevent other loggers from adding handlers
-    logging.getLogger().setLevel(log_level)
+    # Console logging: Clean (WARNING) in chat mode, unless debugging.
+    # In single command mode, we usually want to see what's happening (INFO), unless explicitly quiet?
+    # Actually, for a clean chat UI, we only want warnings/errors.
+    if args.debug:
+        console_log_level = logging.DEBUG
+    elif args.chat or not args.command:
+        # Interactive mode: Hide INFO logs to keep UI clean
+        console_log_level = logging.WARNING
+    else:
+        # Single command mode: Show INFO logs (execution progress)
+        console_log_level = logging.INFO
+
+    # Setup file logging (Root logger)
+    setup_logging(level=file_log_level)
+
+    # Setup console UI logging
+    setup_colored_logging(level=console_log_level)
+
+    # Prevent other loggers from adding handlers that might bypass our settings
+    logging.getLogger().setLevel(file_log_level)
 
     try:
         # Initialize configuration and validate

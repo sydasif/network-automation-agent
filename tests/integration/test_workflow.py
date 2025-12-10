@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 
 from agent.workflow_manager import NetworkAgentWorkflow
 from core.device_inventory import DeviceInventory
@@ -55,11 +55,7 @@ def test_workflow_show_command(mock_infrastructure):
     mock_execution_plan = MagicMock()
     mock_execution_plan.direct_response = None  # No direct response, will execute steps
     mock_execution_plan.steps = [
-        MagicMock(
-            action_type="read",
-            device="R1",
-            command="show version"
-        )
+        MagicMock(action_type="read", device="R1", command="show version")
     ]
     mock_structured_llm = MagicMock()
     mock_structured_llm.invoke.return_value = mock_execution_plan
@@ -70,11 +66,13 @@ def test_workflow_show_command(mock_infrastructure):
     mock_response_model.model_dump.return_value = {"message": "R1 is running Version 1.0"}
     mock_response_structured_llm = MagicMock()
     mock_response_structured_llm.invoke.return_value = mock_response_model
+
     # The response node also uses with_structured_output but for AgentResponse
     def side_effect(schema):
         if schema.__name__ == "AgentResponse":
             return mock_response_structured_llm
         return mock_structured_llm
+
     mock_llm.with_structured_output.side_effect = side_effect
 
     # Setup TaskExecutor response
@@ -128,7 +126,7 @@ def test_workflow_config_approval(mock_infrastructure):
         MagicMock(
             action_type="configure",
             device="R1",
-            command="int lo0\nip addr 1.1.1.1 255.255.255.255"
+            command="int lo0\nip addr 1.1.1.1 255.255.255.255",
         )
     ]
     mock_structured_llm = MagicMock()
@@ -142,11 +140,13 @@ def test_workflow_config_approval(mock_infrastructure):
     }
     mock_response_structured_llm = MagicMock()
     mock_response_structured_llm.invoke.return_value = mock_response_model
+
     # The response node also uses with_structured_output but for AgentResponse
     def side_effect(schema):
         if schema.__name__ == "AgentResponse":
             return mock_response_structured_llm
         return mock_structured_llm
+
     mock_llm.with_structured_output.side_effect = side_effect
 
     # Setup TaskExecutor response for config command

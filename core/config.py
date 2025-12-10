@@ -28,8 +28,8 @@ class NetworkAgentConfig:
         "MAX_HISTORY_TOKENS": (
             "max_history_tokens",
             int,
-            2000,
-        ),  # Changed back to 2000 to match original
+            20000,
+        ),  # Updated from 2000 to 20000 to handle network configs
         "NUM_WORKERS": ("num_workers", int, 20),
         "NETMIKO_TIMEOUT": ("netmiko_timeout", int, 30),
         "NETMIKO_CONN_TIMEOUT": ("netmiko_conn_timeout", int, 10),
@@ -45,7 +45,7 @@ class NetworkAgentConfig:
     llm_model_name: str = "openai/gpt-oss-120b"
     llm_temperature: float = 0.0  # Changed from 0.7 to 0.0 for production precision
     llm_max_tokens: int = 2048
-    max_history_tokens: int = 2000  # Changed back to 2000 to match original
+    max_history_tokens: int = 20000  # Updated from 2000 to 20000 to handle network configs
     num_workers: int = 20
     netmiko_timeout: int = 30
     netmiko_conn_timeout: int = 10

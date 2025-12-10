@@ -5,6 +5,7 @@ Nornir tasks with network-aware error handling.
 """
 
 import logging
+import time  # <--- Import time
 from typing import Any, Union
 
 from netmiko.exceptions import (
@@ -75,12 +76,26 @@ class TaskExecutor:
         if invalid := targets - available_hosts:
             return {"error": f"Devices not found: {sorted(invalid)}"}
 
-        # Filter to target devices and run task
-        filtered_nr = self._nornir_manager.filter_hosts(list(targets))
-        results = filtered_nr.run(task=task_function, **kwargs)
+        # Filter to target devices
+        try:
+            filtered_nr = self._nornir_manager.filter_hosts(list(targets))
 
-        # Transform Nornir results into standardized format
-        return self._process_results(results)
+            # CRITICAL: Check if we actually have hosts after filtering
+            if not filtered_nr.inventory.hosts:
+                return {"error": f"No valid hosts found in inventory matching: {targets}"}
+
+            results = filtered_nr.run(task=task_function, **kwargs)
+
+            # STABILITY FIX: Add a small delay to allow device buffers/sessions to settle
+            # This prevents "Prompt not detected" errors when hitting the same device rapidly
+            time.sleep(1)
+
+            return self._process_results(results)
+
+        except Exception as e:
+            logger.error(f"Critical execution failure: {e}")
+            # Return a formatted error for ALL targets so the UI can show it
+            return {dev: {"success": False, "output": None, "error": str(e)} for dev in targets}
 
     def _process_results(self, results) -> dict[str, Any]:
         """Process Nornir results into standardized format.

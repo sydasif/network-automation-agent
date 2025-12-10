@@ -337,8 +337,11 @@ class ColoredLogHandler(logging.Handler):
             self.handleError(record)
 
 
-def setup_colored_logging():
+def setup_colored_logging(level: int = logging.INFO):
     """Setup colored logging that doesn't interfere with UI elements.
+
+    Args:
+        level: logging level for the console handler.
 
     Creates its own Console instance for logging to avoid requiring
     external console management.
@@ -346,12 +349,14 @@ def setup_colored_logging():
     console = Console()
     handler = ColoredLogHandler(console)
     handler.setFormatter(logging.Formatter("{levelname} - {message}", style="{"))
+    handler.setLevel(level)  # Set the handler's level
 
     # Add handler to root logger
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
 
-    # Suppress INFO messages from nornir.core to remove 'Running task close_connections_task'
+    # Suppress INFO messages from nornir.core regardless of handler level
+    # because they are very verbose during execution
     logging.getLogger("nornir.core").setLevel(logging.WARNING)
 
     return handler
