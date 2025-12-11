@@ -66,6 +66,7 @@ def show_command(
         JSON string with device results
     """
     # Additional validation beyond Pydantic field validators
+    ToolValidator.validate_devices(devices)  # Validate devices list
     command = ToolValidator.validate_command(command)
     ToolValidator.validate_show_command_semantics(command)
 
