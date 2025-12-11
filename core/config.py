@@ -4,10 +4,11 @@ This module contains the NetworkAgentConfig class that manages all
 configuration variables used throughout the application.
 """
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
-import os
+
 from dotenv import load_dotenv
 
 

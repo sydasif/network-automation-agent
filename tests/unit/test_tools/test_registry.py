@@ -1,11 +1,12 @@
 """Unit tests for tool registry and decorator."""
 
-import pytest
 from unittest.mock import MagicMock
 
-from core.task_executor import TaskExecutor
-from tools.registry import network_tool, get_all_tools, reset_registry, get_tool
+import pytest
 from pydantic import BaseModel, Field
+
+from core.task_executor import TaskExecutor
+from tools.registry import get_all_tools, get_tool, network_tool, reset_registry
 
 
 def test_network_tool_decorator():

@@ -1,10 +1,9 @@
 """Tool registry for network automation tools."""
 
-from typing import Dict, Any, Callable, List
-from pydantic import BaseModel
+from typing import Any, Callable, Dict, List
 
 from langchain_core.tools import StructuredTool
-
+from pydantic import BaseModel
 
 # Global registry for tools
 _tools_registry: Dict[str, Dict[str, Any]] = {}
