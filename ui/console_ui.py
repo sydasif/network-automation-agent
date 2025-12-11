@@ -225,22 +225,76 @@ class NetworkAgentUI:
         self.console.print(f"[bold yellow]{Emoji.WARNING}  Warning:[/bold yellow] {warning_msg}")
 
     def print_approval_request(self, tool_calls: list[dict]):
-        """Display approval request for multiple tool calls."""
+        """Display approval request for multiple tool calls with enhanced risk assessment."""
         content = Text()
+
+        # Get risk summary if available
+        risk_summary = None
+        if isinstance(tool_calls, dict) and "tool_calls" in tool_calls:
+            # Handle the case where the input is the full approval request dict
+            risk_summary = tool_calls.get("risk_summary", {})
+            tool_calls = tool_calls.get("tool_calls", [])
+        elif len(tool_calls) > 0 and "risk_level" in tool_calls[0]:
+            # If individual calls have risk level, calculate summary
+            risk_summary = {
+                "high": sum(1 for call in tool_calls if call.get("risk_level") == "high"),
+                "medium": sum(1 for call in tool_calls if call.get("risk_level") == "medium"),
+                "low": sum(1 for call in tool_calls if call.get("risk_level") == "low")
+            }
+
+        # Display risk summary if available
+        if risk_summary:
+            high_risk = risk_summary.get("high", 0)
+            medium_risk = risk_summary.get("medium", 0)
+            low_risk = risk_summary.get("low", 0)
+
+            risk_text = Text()
+            if high_risk > 0:
+                risk_text.append(f"{Emoji.ERROR} HIGH RISK: {high_risk} operations ", style="bold red")
+            if medium_risk > 0:
+                risk_text.append(f"{Emoji.WARNING} MEDIUM RISK: {medium_risk} operations ", style="bold yellow")
+            if low_risk > 0:
+                risk_text.append(f"{Emoji.INFO} LOW RISK: {low_risk} operations ", style="bold green")
+
+            content.append(risk_text)
+            content.append("\n")
+            content.append("=" * 60 + "\n", style="bold")
 
         for i, call in enumerate(tool_calls, 1):
             action = call.get("name")
             args = call.get("args")
+            risk_level = call.get("risk_level", "unknown")
 
-            content.append(f"\n{Emoji.GEAR} Action {i}: {action}\n", style="bold cyan")
-            content.append(f"{Emoji.DATA} Args: {json.dumps(args, indent=2)}\n", style="yellow")
+            # Determine styling based on risk level
+            if risk_level == "high":
+                risk_emoji = Emoji.ERROR
+                risk_style = "bold red"
+            elif risk_level == "medium":
+                risk_emoji = Emoji.WARNING
+                risk_style = "bold yellow"
+            elif risk_level == "low":
+                risk_emoji = Emoji.SUCCESS
+                risk_style = "bold green"
+            else:
+                risk_emoji = Emoji.QUESTION
+                risk_style = "bold white"
+
+            content.append(f"\n{Emoji.GEAR} Operation {i} ({risk_emoji} {risk_level.upper()} RISK):\n", style=risk_style)
+            content.append(f"{Emoji.DATA} Action: {action}\n", style="bold cyan")
+            content.append(f"{Emoji.CONFIG} Args: {json.dumps(args, indent=2)}\n", style="yellow")
+
             if i < len(tool_calls):
-                content.append("-" * 40 + "\n", style="dim")
+                content.append("-" * 60 + "\n", style="dim")
+
+        # Add warning about irreversible changes
+        if risk_summary and risk_summary.get("high", 0) > 0:
+            content.append(f"\n{Emoji.WARNING} WARNING: High-risk operations may cause service disruption!\n", style="bold red")
+            content.append("Please review carefully before approving.\n", style="bold red")
 
         self.console.print(
             Panel(
                 content,
-                title=f"[bold red]{Emoji.APPROVAL} CONFIGURATION CHANGE DETECTED ({len(tool_calls)} Operations) {Emoji.APPROVAL}[/bold red]",
+                title=f"[bold red]{Emoji.APPROVAL} CONFIGURATION CHANGE REQUEST ({len(tool_calls)} Operations) {Emoji.APPROVAL}[/bold red]",
                 border_style="red",
                 expand=False,
             )

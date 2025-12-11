@@ -121,10 +121,8 @@ class WorkflowOrchestrator:
             # Extract approval request
             approval_request = snapshot.tasks[0].interrupts[0].value
             if "tool_calls" in approval_request:
-                tool_calls = approval_request["tool_calls"]
-
-                # Show approval request to user
-                self.ui.print_approval_request(tool_calls)
+                # Pass the entire approval request to include risk summary and enhanced data
+                self.ui.print_approval_request(approval_request)
 
                 # Get user decision
                 decision = self.ui.get_approval_decision()

@@ -24,7 +24,7 @@ def execute_node(state: Dict[str, Any], tools: list) -> Dict[str, Any]:
 
 
 def approval_node(state: Dict[str, Any]) -> Dict[str, Any] | None:
-    """Request user approval for configuration changes."""
+    """Request user approval for configuration changes with enhanced context."""
     # Get the latest tool message
     messages = state.get("messages", [])
     if not messages:
@@ -42,8 +42,32 @@ def approval_node(state: Dict[str, Any]) -> Dict[str, Any] | None:
     if not sensitive_calls:
         return None
 
+    # Enhance the approval request with additional context
+    enhanced_approval_data = []
+    for call in sensitive_calls:
+        enhanced_call = {
+            "id": call["id"],
+            "name": call["name"],
+            "args": call["args"],
+            "risk_level": "high" if any(keyword in str(call["args"]).lower()
+                                      for keyword in ["no ", "shutdown", "delete", "clear", "reload", "erase"])
+                        else "medium" if any(keyword in str(call["args"]).lower()
+                                           for keyword in ["ip address", "route", "acl", "access-list"])
+                        else "low"
+        }
+        enhanced_approval_data.append(enhanced_call)
+
     # Interrupt workflow and wait for user decision on the BATCH of calls
-    decision = interrupt({"type": "approval_request", "tool_calls": sensitive_calls})
+    decision = interrupt({
+        "type": "approval_request",
+        "tool_calls": enhanced_approval_data,
+        "total_calls": len(enhanced_approval_data),
+        "risk_summary": {
+            "high": sum(1 for call in enhanced_approval_data if call["risk_level"] == "high"),
+            "medium": sum(1 for call in enhanced_approval_data if call["risk_level"] == "medium"),
+            "low": sum(1 for call in enhanced_approval_data if call["risk_level"] == "low")
+        }
+    })
 
     if decision == RESUME_APPROVED:
         logger.info(f"User approved batch of {len(sensitive_calls)} calls")
@@ -54,7 +78,7 @@ def approval_node(state: Dict[str, Any]) -> Dict[str, Any] | None:
     denial_messages = [
         ToolMessage(
             tool_call_id=tc["id"],
-            content=f"❌ User denied permission for operation: {tc['name']}",
+            content=f"❌ User denied permission for operation: {tc['name']} (Risk: {tc.get('risk_level', 'unknown')})",
         )
         for tc in sensitive_calls
     ]

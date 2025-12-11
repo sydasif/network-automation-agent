@@ -1,11 +1,11 @@
 """Show command tool for read-only network operations.
 
 This module provides a function-based show command tool for executing
-read-only show commands on network devices.
+read-only show commands on network devices with enhanced validation.
 """
 
 from nornir_netmiko.tasks import netmiko_send_command
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core.task_executor import TaskExecutor
 from tools.registry import network_tool
@@ -14,10 +14,29 @@ from utils.responses import process_nornir_result
 
 
 class ShowCommandInput(BaseModel):
-    """Input schema for show commands."""
+    """Input schema for show commands with enhanced validation."""
 
-    devices: list[str] = Field(description="List of device hostnames (e.g., ['sw1', 'sw2']).")
-    command: str = Field(description="The show command to execute (e.g., 'show ip int brief').")
+    devices: list[str] = Field(
+        description="List of device hostnames (e.g., ['sw1', 'sw2']). Must contain valid device names from inventory."
+    )
+    command: str = Field(
+        description="The show command to execute (e.g., 'show ip int brief'). Must be a read-only command."
+    )
+
+    @field_validator('devices')
+    @classmethod
+    def validate_devices(cls, v):
+        """Validate device list using ToolValidator."""
+        ToolValidator.validate_devices(v)
+        return v
+
+    @field_validator('command')
+    @classmethod
+    def validate_command(cls, v):
+        """Validate command using ToolValidator."""
+        validated_command = ToolValidator.validate_command(v)
+        ToolValidator.validate_show_command_semantics(validated_command)
+        return validated_command
 
 
 @network_tool(
@@ -26,6 +45,7 @@ class ShowCommandInput(BaseModel):
         "Run 'show' commands on network devices. "
         "Use for: viewing config, status, routing, ARP/MAC. "
         "REQUIREMENT: Use valid device names from inventory. "
+        "REQUIREMENT: Command must be read-only (e.g., 'show', 'display'). "
         "read-only operation. "
     ),
     schema=ShowCommandInput,
@@ -45,9 +65,9 @@ def show_command(
     Returns:
         JSON string with device results
     """
-    # Validate inputs using ToolValidator (raises OutputParserException when invalid)
-    ToolValidator.validate_devices(devices)
-    ToolValidator.validate_command(command)
+    # Additional validation beyond Pydantic field validators
+    command = ToolValidator.validate_command(command)
+    ToolValidator.validate_show_command_semantics(command)
 
     # Execute via task executor
     results = task_executor.execute_task(

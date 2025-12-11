@@ -1,11 +1,11 @@
 """Configuration command tool for network device configuration.
 
 This module provides a function-based config command tool for applying
-configuration changes to network devices.
+configuration changes to network devices with enhanced validation.
 """
 
 from nornir_netmiko.tasks import netmiko_send_config
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core.task_executor import TaskExecutor
 from tools.registry import network_tool
@@ -14,12 +14,29 @@ from utils.responses import process_nornir_result
 
 
 class ConfigCommandInput(BaseModel):
-    """Input schema for configuration commands."""
+    """Input schema for configuration commands with enhanced validation."""
 
-    devices: list[str] = Field(description="List of device hostnames (e.g., ['sw1', 'sw2']).")
-    configs: list[str] = Field(
-        description="List of configuration commands.",
+    devices: list[str] = Field(
+        description="List of device hostnames (e.g., ['sw1', 'sw2']). Must contain valid device names from inventory."
     )
+    configs: list[str] = Field(
+        description="List of configuration commands to apply. Each command must be valid configuration syntax."
+    )
+
+    @field_validator('devices')
+    @classmethod
+    def validate_devices(cls, v):
+        """Validate device list using ToolValidator."""
+        ToolValidator.validate_devices(v)
+        return v
+
+    @field_validator('configs')
+    @classmethod
+    def validate_configs(cls, v):
+        """Validate configs using ToolValidator."""
+        validated_configs = ToolValidator.validate_configs(v)
+        ToolValidator.validate_config_command_semantics(validated_configs)
+        return validated_configs
 
 
 @network_tool(
@@ -27,7 +44,9 @@ class ConfigCommandInput(BaseModel):
     description=(
         "Apply config changes to devices. REQUIRES APPROVAL. "
         "Use for: interfaces, routing, ACLs, VLANs. "
-        "REQUIREMENT: Use valid device platform syntax. "
+        "REQUIREMENT: Use valid device names from inventory. "
+        "REQUIREMENT: Commands must be valid configuration syntax (no show commands). "
+        "REQUIREMENT: All changes require explicit approval before execution. "
     ),
     schema=ConfigCommandInput,
 )
@@ -46,9 +65,10 @@ def config_command(
     Returns:
         JSON string with device results
     """
-    # Validate inputs using ToolValidator
+    # Additional validation beyond Pydantic field validators
     ToolValidator.validate_devices(devices)
     clean_configs = ToolValidator.validate_configs(configs)
+    ToolValidator.validate_config_command_semantics(clean_configs)
 
     # Execute via task executor
     results = task_executor.execute_task(
