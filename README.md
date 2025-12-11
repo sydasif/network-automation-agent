@@ -33,7 +33,7 @@ graph TD
 
 ### Workflow Logic
 
-1. **Context Manager**: Compresses old tool outputs to save tokens while keeping the conversation flow intact.
+1. **Message Manager**: Compresses old tool outputs to save tokens while keeping the conversation flow intact.
 2. **Understanding Node**: Analyzes user intent and selects the appropriate tool (`show_command` or `config_command`).
 3. **Approval Node**: Intercepts state-changing commands. Pauses for user confirmation.
 4. **Execute Node**: Runs Nornir tasks against live devices and bundles the raw output.
@@ -47,22 +47,36 @@ network-automation-agent/
 │   ├── workflow_manager.py # Linear Graph definition
 │   ├── schemas.py          # Pydantic output models
 │   ├── prompts.py          # System prompts
-│   └── nodes/              # Workflow steps
-│       ├── understanding_node.py
-│       ├── execute_node.py
-│       ├── approval_node.py
-│       └── response_node.py
+│   ├── nodes.py            # All workflow nodes (understanding, execute, approval, response)
+│   ├── state.py            # State definitions
+│   └── constants.py        # Shared constants
 ├── core/                   # Infrastructure
+│   ├── config.py           # Configuration management
 │   ├── nornir_manager.py   # Device connectivity
-│   ├── context_manager.py  # Token optimization
-│   └── llm_provider.py     # Groq client factory
+│   ├── llm_provider.py     # LLM client factory
+│   ├── message_manager.py  # Token optimization
+│   ├── device_inventory.py # Device validation
+│   └── task_executor.py    # Task execution
 ├── tools/                  # Capabilities
 │   ├── show_tool.py        # Read-only commands
-│   └── config_tool.py      # Config changes
+│   ├── config_tool.py      # Config changes
+│   ├── registry.py         # Tool registry
+│   └── validators.py       # Input validation
 ├── cli/                    # User Interface
-│   └── application.py      # App lifecycle
-└── ui/                     # Presentation
-    └── console_ui.py       # Rich-based terminal UI
+│   ├── application.py      # Main application logic
+│   ├── orchestrator.py     # Workflow orchestration
+│   └── bootstrapper.py     # Dependency initialization
+├── ui/                     # Presentation
+│   └── console_ui.py       # Rich-based terminal UI
+├── utils/                  # Utilities
+│   ├── logger.py           # Logging utilities
+│   └── responses.py        # Response helpers
+├── main.py                 # Application entry point
+├── hosts.yaml              # Device inventory
+├── groups.yaml             # Device groups
+├── config.yaml             # Application configuration
+├── pyproject.toml          # Project dependencies
+└── uv.lock                 # Dependency lock file
 ```
 
 ## 🚀 Quick Start
