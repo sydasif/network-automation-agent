@@ -10,6 +10,8 @@ An AI-powered network automation assistant that uses natural language to manage 
 - **Smart Context Management**: Intelligently compresses massive network outputs (like `show running-config`) to maintain long conversation history without hitting token limits.
 - **Human-in-the-Loop**: Critical configuration changes trigger an interrupt, requiring explicit user approval via CLI before execution.
 - **Multi-Vendor Support**: Works with Cisco IOS/XE, Arista EOS, Juniper Junos, etc. (via Netmiko/Nornir).
+- **Enhanced Validation & Risk Assessment**: Advanced validation layer that checks commands against device inventory and assesses risk of configuration changes before execution.
+- **Safety-First Design**: Multiple validation layers prevent unauthorized or dangerous operations on network devices.
 
 ## 🏗️ Architecture
 
@@ -34,8 +36,8 @@ graph TD
 ### Workflow Logic
 
 1. **Message Manager**: Compresses old tool outputs to save tokens while keeping the conversation flow intact.
-2. **Understanding Node**: Analyzes user intent and selects the appropriate tool (`show_command` or `config_command`).
-3. **Approval Node**: Intercepts state-changing commands. Pauses for user confirmation.
+2. **Understanding Node**: Analyzes user intent and selects the appropriate tool (`show_command` or `config_command`) with enhanced validation.
+3. **Approval Node**: Intercepts state-changing commands. Pauses for user confirmation with risk assessment.
 4. **Execute Node**: Runs Nornir tasks against live devices and bundles the raw output.
 5. **Response Node**: Analyzes the raw execution data and generates a professional Markdown summary using strict Pydantic schemas.
 
@@ -97,21 +99,46 @@ network-automation-agent/
     cd network-automation-agent
     ```
 
-2. **Install dependencies:**
+2. **Install dependencies with uv:**
 
     ```bash
+    # Install uv if you don't have it
+    pip install uv
+
+    # Sync project dependencies
     uv sync
     ```
 
 3. **Configure Environment:**
 
     ```bash
+    # Copy the example environment file
     cp .env.example .env
-    # Edit .env and add: GROQ_API_KEY=your_key_here
+    # Edit .env and add your Groq API key: GROQ_API_KEY=your_key_here
     ```
 
-4. **Define Inventory:**
-    Edit `hosts.yaml` and `groups.yaml` to match your lab/network environment.
+4. **Configure Device Inventory:**
+    Edit `hosts.yaml` and `groups.yaml` to match your network environment:
+
+    ```yaml
+    # hosts.yaml - Define your network devices
+    r1:
+      hostname: 192.168.1.1
+      groups: [cisco]
+    s1:
+      hostname: 192.168.1.2
+      groups: [arista]
+
+    # groups.yaml - Define device groups and credentials
+    cisco:
+      platform: cisco_ios
+      username: admin
+      password: secure_password
+    arista:
+      platform: arista_eos
+      username: admin
+      password: secure_password
+    ```
 
 ### Usage
 
@@ -127,28 +154,103 @@ uv run python main.py --chat
 uv run python main.py "show ip interface brief on R1"
 ```
 
+**Specify Target Device:**
+
+```bash
+uv run python main.py --device R1 "show version"
+```
+
 **Debug Mode:**
 
 ```bash
 uv run python main.py --chat --debug
 ```
 
-## 🧠 Key Concepts
+## 🔧 Configuration
 
-### Linear vs Cyclic
+### Application Configuration (config.yaml)
 
-Unlike "ReAct" agents that loop until they decide to stop, this agent creates a **Single Execution Plan**. This prevents the AI from "thinking out loud" or hallucinating follow-up commands, making it safer for production networks.
+The application uses a Nornir-based configuration that supports:
 
-### Safety First
+- Inventory management (host and group files)
+- Parallel execution settings (num_workers)
+- Connection timeouts and options
+- Logging configuration
 
-- **Validation**: Tools validate that target devices exist in the inventory before execution.
-- **Approval**: Any state-changing command (`config_command`) requires explicit user confirmation.
-- **Strict Parsing**: Output is parsed into `AgentResponse` objects, preventing malformed JSON errors.
+Key settings that can be overridden via environment variables:
+- `NUM_WORKERS`: Number of parallel workers (default: 20)
+- `NETMIKO_TIMEOUT`: Command timeout in seconds (default: 30)
+- `NETMIKO_CONN_TIMEOUT`: Connection timeout in seconds (default: 10)
+- `NETMIKO_SESSION_TIMEOUT`: Session timeout in seconds (default: 60)
+
+### Environment Variables
+
+Required:
+- `GROQ_API_KEY`: API key for Groq cloud service
+
+Optional:
+- `NUM_WORKERS`: Number of concurrent connections to devices
+- `NETMIKO_TIMEOUT`: Command execution timeout
+- `NETMIKO_CONN_TIMEOUT`: Device connection timeout
+- `NETMIKO_SESSION_TIMEOUT`: Session timeout
+
+## 🛡️ Safety & Validation
+
+### Multi-Layer Validation System
+
+The agent implements multiple layers of safety:
+
+1. **Device Inventory Validation**: Ensures target devices exist before execution
+2. **Command Validation**: Validates command syntax and safety
+3. **Risk Assessment**: Evaluates configuration commands for potential risks
+4. **Human Approval**: Critical changes require explicit user confirmation
+
+### Command Types
+
+- **Show Commands**: Execute directly after validation
+- **Config Commands**: Require explicit user approval with risk assessment
+
+## 🧪 Testing
+
+Run the test suite to ensure everything works correctly:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run specific test file
+uv run pytest tests/unit/test_core/test_config.py
+
+# Run with verbose output
+uv run pytest -v
+
+# Run integration tests
+uv run pytest tests/integration/
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Ensure tests pass: `uv run pytest`
-5. Submit a pull request
+4. Add tests if applicable
+5. Ensure tests pass: `uv run pytest`
+6. Commit your changes with descriptive messages
+7. Push to the branch: `git push origin feature/amazing-feature`
+8. Open a pull request
+
+### Development Commands
+
+- Install dependencies: `uv sync`
+- Add new dependency: `uv add package_name`
+- Update dependencies: `uv sync --refresh`
+- Run tests: `uv run pytest`
+- Run with debug: `uv run python main.py --chat --debug`
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🚨 Disclaimer
+
+This tool is designed for managing network infrastructure. Use responsibly and ensure you have proper authorization before connecting to any network devices. The authors are not responsible for any damage caused by misuse of this tool.
