@@ -7,6 +7,7 @@
 # - NETMIKO_TIMEOUT: Command timeout in seconds (default: 30)
 # - NETMIKO_CONN_TIMEOUT: Connection timeout in seconds (default: 10)
 # - NETMIKO_SESSION_TIMEOUT: Session timeout in seconds (default: 60)
+# - NETMIKO_KEEP_ALIVE: Seconds to keep connection alive (default: 30)
 
 inventory:
   plugin: SimpleInventory
@@ -28,3 +29,10 @@ defaults:
         timeout: 30
         conn_timeout: 10
         session_timeout: 60
+        # Keep-alive to maintain connections for multiple commands
+        keepalive: 30
+        # Fast timing parameters for better performance
+        fast_cli: true
+        # Additional performance parameters
+        global_cmd_verify: false
+        auto_connect: true

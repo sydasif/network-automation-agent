@@ -7,6 +7,7 @@ Nornir tasks with network-aware error handling.
 import logging
 import time  # <--- Import time
 from typing import Any, Union
+import random
 
 from netmiko.exceptions import (
     NetmikoAuthenticationException,
@@ -34,10 +35,57 @@ class TaskExecutor:
         """
         self._nornir_manager = nornir_manager
 
+    def _execute_with_retry(self, nornir_instance, task_function, max_retries=3, **kwargs):
+        """Execute Nornir task with retry logic for transient failures.
+
+        Args:
+            nornir_instance: Filtered Nornir instance to run the task on
+            task_function: Nornir task function to execute
+            max_retries: Maximum number of retry attempts
+            **kwargs: Additional arguments to pass to task function
+
+        Returns:
+            Results from the Nornir task execution
+        """
+        for attempt in range(max_retries + 1):  # First attempt + retries
+            try:
+                results = nornir_instance.run(task=task_function, **kwargs)
+
+                # Check if there are any failures that might be transient
+                has_transient_failures = False
+                for hostname, result in results.items():
+                    if result.failed:
+                        # Check if the failure is a timeout or connection issue that might be transient
+                        if (result.exception and
+                            (isinstance(result.exception, (NetmikoTimeoutException, ConnectionError)) or
+                             "timeout" in str(result.exception).lower() or
+                             "connection" in str(result.exception).lower())):
+                            has_transient_failures = True
+                            break
+
+                # If there are no failures or no transient failures, return results
+                if not has_transient_failures or attempt == max_retries:
+                    return results
+
+                # If there are transient failures, log and retry after a delay
+                logger.warning(f"Transient failures detected, retrying in {2 ** attempt}s (attempt {attempt + 1}/{max_retries + 1})")
+                time.sleep(2 ** attempt + random.uniform(0, 1))  # Exponential backoff with jitter
+
+            except Exception as e:
+                if attempt == max_retries:
+                    # If we've exhausted retries, re-raise the exception
+                    raise e
+                logger.warning(f"Attempt {attempt + 1} failed with error: {e}, retrying in {2 ** attempt}s")
+                time.sleep(2 ** attempt + random.uniform(0, 1))  # Exponential backoff with jitter
+
+        # This should not be reached, but return results if needed
+        return nornir_instance.run(task=task_function, **kwargs)
+
     def execute_task(
         self,
         target_devices: Union[str, list[str]],
         task_function: callable,
+        max_retries: int = 2,  # Default to 2 retries for transient issues
         **kwargs,
     ) -> dict[str, Any]:
         """Execute Nornir task with network-aware error handling.
@@ -45,6 +93,7 @@ class TaskExecutor:
         Args:
             target_devices: Single device or list of devices to target.
             task_function: Nornir task function to execute.
+            max_retries: Maximum number of retry attempts for transient failures (default: 2).
             **kwargs: Additional arguments to pass to task function.
 
         Returns:
@@ -76,19 +125,41 @@ class TaskExecutor:
         if invalid := targets - available_hosts:
             return {"error": f"Devices not found: {sorted(invalid)}"}
 
-        # Filter to target devices
+        # Calculate optimal number of workers based on target devices
+        num_targets = len(targets)
+        # Use between 4 and 20 workers, or number of targets if less than 4
+        optimal_workers = min(max(4, num_targets), 20)
+
+        # Filter to target devices with optimal worker count
         try:
-            filtered_nr = self._nornir_manager.filter_hosts(list(targets))
+            filtered_nr = self._nornir_manager.filter_hosts(list(targets), num_workers=optimal_workers)
 
             # CRITICAL: Check if we actually have hosts after filtering
             if not filtered_nr.inventory.hosts:
                 return {"error": f"No valid hosts found in inventory matching: {targets}"}
 
-            results = filtered_nr.run(task=task_function, **kwargs)
+            # Pre-flight connectivity check
+            connectivity_results = self._nornir_manager.test_connectivity(list(targets))
+            unreachable = [host for host, is_reachable in connectivity_results.items() if not is_reachable]
+
+            if unreachable:
+                logger.warning(f"Unreachable devices detected: {unreachable}")
+                # Continue execution but warn - some devices might be temporarily unreachable
+                # In a production environment, you might want to fail fast instead
+                pass
+
+            # Execute with retry logic for transient failures
+            results = self._execute_with_retry(
+                nornir_instance=filtered_nr,
+                task_function=task_function,
+                max_retries=max_retries,
+                **kwargs
+            )
 
             # STABILITY FIX: Add a small delay to allow device buffers/sessions to settle
             # This prevents "Prompt not detected" errors when hitting the same device rapidly
-            time.sleep(1)
+            # Reduce the delay since we now have better worker management
+            time.sleep(0.5)
 
             return self._process_results(results)
 

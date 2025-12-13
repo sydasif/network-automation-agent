@@ -65,12 +65,59 @@ def test_filter_hosts(mock_config):
         manager = NornirManager(mock_config)
 
         # Mock the filter method
-
         manager.filter_hosts(["R1", "R2"])
 
         # Verify filter was called correctly
         # Note: We can't easily check the F object equality, but we can check the call happened
         mock_nornir.filter.assert_called_once()
+
+
+def test_filter_hosts_with_workers(mock_config):
+    """Test filtering hosts with custom worker count."""
+    with patch("core.nornir_manager.InitNornir") as mock_init:
+        mock_nornir = MagicMock()
+        mock_nornir.config.core.num_workers = 20  # Default
+        mock_init.return_value = mock_nornir
+
+        manager = NornirManager(mock_config)
+
+        # Test filtering with custom worker count
+        result = manager.filter_hosts(["R1", "R2"], num_workers=10)
+
+        # Verify filter was called and worker count was set
+        mock_nornir.filter.assert_called_once()
+        assert result.config.core.num_workers == 10
+
+
+def test_test_connectivity_method(mock_config):
+    """Test the connectivity testing method."""
+    with patch("core.nornir_manager.InitNornir") as mock_init:
+        mock_nornir = MagicMock()
+        mock_init.return_value = mock_nornir
+
+        # Setup mock inventory hosts
+        mock_hosts = {
+            "R1": MagicMock(),
+            "R2": MagicMock()
+        }
+        mock_nornir.inventory.hosts.items.return_value = mock_hosts.items()
+
+        # Setup mock results for connectivity test
+        mock_results = MagicMock()
+        mock_results.items.return_value = [
+            ("R1", MagicMock(failed=False)),  # R1 is reachable
+            ("R2", MagicMock(failed=True))   # R2 is not reachable
+        ]
+        mock_nornir.filter.return_value.run.return_value = mock_results
+
+        manager = NornirManager(mock_config)
+
+        # Test connectivity for all hosts
+        results = manager.test_connectivity()
+
+        # Verify results
+        assert results["R1"] is True  # R1 should be reachable
+        assert results["R2"] is False  # R2 should not be reachable
 
 
 def test_close(mock_config):
