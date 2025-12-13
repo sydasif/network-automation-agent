@@ -53,7 +53,6 @@ class NornirManager:
         if num_workers is not None:
             # Initialize Nornir with custom configuration
             config = Config()
-            config.core.num_workers = num_workers
             config.inventory.plugin = "SimpleInventory"
             config.inventory.options = {
                 "host_file": "hosts.yaml",
@@ -105,7 +104,9 @@ class NornirManager:
         # If num_workers is specified, we need to create a new instance with that setting
         if num_workers is not None:
             # Update the runner configuration for this specific execution
-            filtered_nornir.config.core.num_workers = num_workers
+            # The filtered instance should maintain the same configuration structure
+            if hasattr(filtered_nornir.config, 'runner') and hasattr(filtered_nornir.config.runner, 'options'):
+                filtered_nornir.config.runner.options["num_workers"] = num_workers
 
         return filtered_nornir
 

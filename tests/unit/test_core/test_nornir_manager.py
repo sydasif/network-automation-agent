@@ -76,7 +76,14 @@ def test_filter_hosts_with_workers(mock_config):
     """Test filtering hosts with custom worker count."""
     with patch("core.nornir_manager.InitNornir") as mock_init:
         mock_nornir = MagicMock()
-        mock_nornir.config.core.num_workers = 20  # Default
+        # Set up the config structure to match actual implementation
+        mock_nornir.config.runner.options = {"num_workers": 20}  # Default
+
+        # Mock the filter method to return a filtered instance with proper config structure
+        filtered_instance = MagicMock()
+        filtered_instance.config.runner.options = {"num_workers": 20}  # Default for filtered instance
+        mock_nornir.filter.return_value = filtered_instance
+
         mock_init.return_value = mock_nornir
 
         manager = NornirManager(mock_config)
@@ -84,9 +91,9 @@ def test_filter_hosts_with_workers(mock_config):
         # Test filtering with custom worker count
         result = manager.filter_hosts(["R1", "R2"], num_workers=10)
 
-        # Verify filter was called and worker count was set
+        # Verify filter was called and worker count was set in runner options
         mock_nornir.filter.assert_called_once()
-        assert result.config.core.num_workers == 10
+        assert result.config.runner.options["num_workers"] == 10
 
 
 def test_test_connectivity_method(mock_config):
