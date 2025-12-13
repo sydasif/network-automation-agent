@@ -7,6 +7,7 @@ This document outlines a comprehensive plan to modernize the Network Automation 
 ## Current State Assessment
 
 The Network Automation Agent is a well-architected system with:
+
 - Linear pipeline architecture using LangGraph
 - Human-in-the-loop approval for configuration changes
 - Comprehensive validation and safety checks
@@ -24,6 +25,7 @@ The Network Automation Agent is a well-architected system with:
 ## Phase 1: Core Architecture Improvements (Week 1-2)
 
 ### 1.1 State Management Modernization
+
 - **Objective**: Upgrade from `TypedDict` to `StateGraphAnnotation`
 - **Tasks**:
   - Create new `AgentState` class using `StateGraphAnnotation`
@@ -34,6 +36,7 @@ The Network Automation Agent is a well-architected system with:
 - **Impact**: Medium - improves code clarity and extensibility
 
 ### 1.2 Dependency Injection Enhancement
+
 - **Objective**: Modernize dependency injection patterns
 - **Tasks**:
   - Replace `functools.partial` with configuration-based dependency injection
@@ -44,6 +47,7 @@ The Network Automation Agent is a well-architected system with:
 - **Impact**: Medium - improves maintainability
 
 ### 1.3 Message Management Improvements
+
 - **Objective**: Enhance message management with modern patterns
 - **Tasks**:
   - Evaluate LangChain's newer message management tools
@@ -56,6 +60,7 @@ The Network Automation Agent is a well-architected system with:
 ## Phase 2: Tool and Execution Enhancements (Week 3-4)
 
 ### 2.1 Tool Execution Modernization
+
 - **Objective**: Modernize tool execution patterns
 - **Tasks**:
   - Update tool definitions to use `StructuredTool` with proper return schemas
@@ -66,6 +71,7 @@ The Network Automation Agent is a well-architected system with:
 - **Impact**: High - significantly improves user experience
 
 ### 2.2 Structured Output Enhancement
+
 - **Objective**: Improve structured output handling
 - **Tasks**:
   - Use newer `JsonSchema` outputs for more flexible schema definitions
@@ -78,6 +84,7 @@ The Network Automation Agent is a well-architected system with:
 ## Phase 3: Monitoring and Observability (Week 5)
 
 ### 3.1 LangSmith Integration
+
 - **Objective**: Add comprehensive monitoring and tracing
 - **Tasks**:
   - Implement LangSmith tracing for all workflow components
@@ -88,6 +95,7 @@ The Network Automation Agent is a well-architected system with:
 - **Impact**: High - critical for production monitoring
 
 ### 3.2 Enhanced Error Handling
+
 - **Objective**: Improve error handling and recovery
 - **Tasks**:
   - Implement retry strategies using LangChain's newer mechanisms
@@ -100,6 +108,7 @@ The Network Automation Agent is a well-architected system with:
 ## Phase 4: Performance and Scalability (Week 6)
 
 ### 4.1 Async Execution Implementation
+
 - **Objective**: Add asynchronous execution capabilities
 - **Tasks**:
   - Update workflow to support async execution
@@ -110,6 +119,7 @@ The Network Automation Agent is a well-architected system with:
 - **Impact**: High - significantly improves performance
 
 ### 4.2 Streaming Responses
+
 - **Objective**: Implement streaming for better user experience
 - **Tasks**:
   - Add streaming support for long-running commands
@@ -122,6 +132,7 @@ The Network Automation Agent is a well-architected system with:
 ## Phase 5: Security and Compliance (Week 7)
 
 ### 5.1 Enhanced Security Features
+
 - **Objective**: Add advanced security and audit capabilities
 - **Tasks**:
   - Implement RBAC patterns for role-based access control
@@ -132,6 +143,7 @@ The Network Automation Agent is a well-architected system with:
 - **Impact**: Medium - important for enterprise deployments
 
 ### 5.2 Configuration Extensibility
+
 - **Objective**: Make the system more configurable and extensible
 - **Tasks**:
   - Implement configurable workflow patterns based on use cases
@@ -144,6 +156,7 @@ The Network Automation Agent is a well-architected system with:
 ## Phase 6: Testing and Quality Assurance (Week 8)
 
 ### 6.1 Enhanced Testing Framework
+
 - **Objective**: Improve test coverage and quality
 - **Tasks**:
   - Add LangGraph testing utilities and patterns
@@ -154,6 +167,7 @@ The Network Automation Agent is a well-architected system with:
 - **Impact**: High - ensures quality and reliability
 
 ### 6.2 Performance Testing
+
 - **Objective**: Validate performance improvements
 - **Tasks**:
   - Create performance benchmarks for before/after comparison
@@ -177,11 +191,13 @@ The Network Automation Agent is a well-architected system with:
 ## Risk Mitigation
 
 ### Technical Risks
+
 - **Backward Compatibility**: Maintain existing API contracts during modernization
 - **Safety Features**: Ensure all safety and validation features remain intact
 - **Performance**: Validate that modernization doesn't degrade performance
 
 ### Mitigation Strategies
+
 - Implement changes incrementally with thorough testing
 - Maintain parallel implementations during transition
 - Conduct extensive integration testing
