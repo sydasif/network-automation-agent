@@ -1,22 +1,26 @@
 """State management for the agent workflow.
 
 This module defines the State structure used throughout
-the LangGraph workflow.
+the LangGraph workflow with extended fields.
 """
 
-from typing import Annotated, TypedDict
+from typing import Annotated, List, Optional, Dict, Any
+from typing_extensions import TypedDict
 
-from langgraph.graph.message import add_messages
+from langgraph.graph import add_messages
 
 
 class State(TypedDict):
-    """State structure for the agent workflow.
+    """State structure for the agent workflow with extended fields.
 
-    The state contains the conversation history as a list of messages.
-    LangGraph's add_messages reducer handles message updates automatically.
+    The state contains the conversation history as a list of messages
+    and additional fields for enhanced functionality.
     """
-
-    messages: Annotated[list, add_messages]
+    messages: Annotated[List, add_messages]
+    device_status: Optional[Dict[str, Any]]
+    current_session: Optional[str]
+    approval_context: Optional[Dict[str, Any]]
+    execution_metadata: Optional[Dict[str, Any]]
 
 
 # Node name constants for workflow graph
