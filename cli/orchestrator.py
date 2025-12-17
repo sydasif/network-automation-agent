@@ -1,4 +1,4 @@
-"""Orchestrator for handling workflow execution and user interaction."""
+"""Orchestrator for handling workflow execution and user interaction with monitoring."""
 
 import logging
 import uuid
@@ -18,16 +18,21 @@ from agent.state import (
 )
 from ui.console_ui import Emoji
 
+# Import monitoring components
+from monitoring.callbacks import AlertingCallbackHandler
+
 logger = logging.getLogger(__name__)
 
 
 class WorkflowOrchestrator:
-    """Handles workflow execution and user interaction."""
+    """Handles workflow execution and user interaction with monitoring."""
 
     def __init__(self, workflow, ui, config):
         self.workflow = workflow
         self.ui = ui
         self.config = config
+        # Get monitoring handler from workflow if available
+        self.monitoring_handler = getattr(workflow, '_monitoring_handler', None)
 
     def execute_command(
         self,
@@ -44,6 +49,11 @@ class WorkflowOrchestrator:
 
         config = {"configurable": {"thread_id": session_id}}
 
+        # Initialize monitoring for this session
+        if self.monitoring_handler:
+            self.monitoring_handler.set_session_id(session_id)
+            self.monitoring_handler.reset_session()  # Reset for new session
+
         # Run the workflow using streaming to update UI
         final_state = self._run_workflow_stream(
             {"messages": [HumanMessage(content=full_command)]},
@@ -52,7 +62,14 @@ class WorkflowOrchestrator:
         )
 
         # Handle approval loop if needed
-        return self._handle_approval_loop(session_id, final_state)
+        result = self._handle_approval_loop(session_id, final_state)
+
+        # Log session statistics
+        if self.monitoring_handler:
+            stats = self.monitoring_handler.get_session_stats()
+            logger.info(f"Session {session_id} completed. Stats: {stats}")
+
+        return result
 
     def _build_prompt(self, command: str, device: Optional[str] = None) -> str:
         """Build prompt with device context."""

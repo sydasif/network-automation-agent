@@ -42,6 +42,7 @@ The system relies on Pydantic schemas for structured LLM outputs (in `agent/sche
 
 - `agent/`: Core AI logic including workflow, nodes, state management, and structured schemas
 - `core/`: Infrastructure components like configuration, device connectivity, LLM provider, and message management
+- `monitoring/`: Monitoring and observability components including tracing, callbacks, dashboard, and alerting
 - `tools/`: Network operation capabilities (show and config commands) with validation and risk assessment
 - `cli/`: Command-line interface and orchestration
 - `ui/`: Terminal user interface with rich console output and approval prompts
@@ -80,6 +81,7 @@ The system includes sophisticated approval mechanisms:
 - Interactive chat mode: `uv run python main.py --chat`
 - Single command mode: `uv run python main.py "show ip interface brief on R1"`
 - Debug mode: `uv run python main.py --chat --debug`
+- Monitoring dashboard: `uv run python main.py --monitor`
 
 ### Testing
 
@@ -103,6 +105,10 @@ The system includes sophisticated approval mechanisms:
 - `agent/state.py` - State structure definition for the LangGraph workflow
 - `core/nornir_manager.py` - Handles device connectivity and Nornir lifecycle
 - `core/llm_provider.py` - LLM interface with Groq API
+- `monitoring/tracing.py` - LangSmith tracing integration
+- `monitoring/callbacks.py` - Custom monitoring callbacks for tracking execution
+- `monitoring/dashboard.py` - Monitoring dashboard functionality
+- `monitoring/alerting.py` - Alert management system
 - `tools/show_tool.py` and `tools/config_tool.py` - Core network operation tools with validation
 - `tools/validators.py` - Command validation and safety checks
 - `config.yaml` - Nornir configuration

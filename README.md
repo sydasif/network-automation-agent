@@ -11,6 +11,7 @@ An AI-powered network automation assistant that uses natural language to manage 
 - **Human-in-the-Loop**: Critical configuration changes trigger an interrupt, requiring explicit user approval via CLI before execution.
 - **Multi-Vendor Support**: Works with Cisco IOS/XE, Arista EOS, Juniper Junos, etc. (via Netmiko/Nornir).
 - **Enhanced Validation & Risk Assessment**: Advanced validation layer that checks commands against device inventory and assesses risk of configuration changes before execution.
+- **Comprehensive Monitoring & Observability**: Built-in monitoring dashboard, performance metrics, and alerting system with support for email and Slack notifications.
 - **Safety-First Design**: Multiple validation layers prevent unauthorized or dangerous operations on network devices.
 
 ## 🏗️ Architecture
@@ -59,6 +60,11 @@ network-automation-agent/
 │   ├── message_manager.py  # Token optimization
 │   ├── device_inventory.py # Device validation
 │   └── task_executor.py    # Task execution
+├── monitoring/             # Monitoring & Observability
+│   ├── tracing.py          # LangSmith integration
+│   ├── callbacks.py        # Monitoring callbacks
+│   ├── dashboard.py        # Dashboard functionality
+│   └── alerting.py         # Alert management system
 ├── tools/                  # Capabilities
 │   ├── show_tool.py        # Read-only commands
 │   ├── config_tool.py      # Config changes
@@ -80,6 +86,42 @@ network-automation-agent/
 ├── pyproject.toml          # Project dependencies
 └── uv.lock                 # Dependency lock file
 ```
+
+## 📊 Monitoring & Observability
+
+The Network Automation Agent includes a comprehensive monitoring and observability system that provides real-time insights into workflow performance, tool execution, and system health.
+
+### Monitoring Features
+
+- **Real-time Dashboard**: Text-based dashboard showing system health, performance metrics, and recent sessions
+- **Performance Metrics**: Track tool execution times, LLM response times, and success rates
+- **Alerting System**: Configurable alerts for slow performance, errors, and failures with email and Slack notifications
+- **Session Tracking**: Monitor individual workflow sessions with detailed execution statistics
+- **LangSmith Integration**: Optional integration for advanced tracing and analytics
+
+### Monitoring Dashboard
+
+To view the monitoring dashboard:
+
+```bash
+uv run python main.py --monitor
+```
+
+The dashboard displays:
+- System status and uptime
+- Performance metrics with health indicators
+- Recent session history
+- Alert summary and recent alerts
+
+### Alert Configuration
+
+The system supports multiple alert types and severity levels:
+
+- **Alert Types**: PERFORMANCE, ERROR, FAILURE, TIMEOUT, SECURITY
+- **Severity Levels**: LOW, MEDIUM, HIGH, CRITICAL
+- **Notification Channels**: Email, Slack, console logging
+
+For advanced alerting configuration, you can set up email and Slack notifications in the monitoring configuration.
 
 ## 🚀 Quick Start
 

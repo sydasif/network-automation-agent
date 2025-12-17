@@ -1,4 +1,4 @@
-"""Workflow manager for the Network AI Agent with Persistence."""
+"""Workflow manager for the Network AI Agent with Persistence and Monitoring."""
 
 import logging
 from functools import partial
@@ -32,6 +32,10 @@ from core.device_inventory import DeviceInventory
 from core.llm_provider import LLMProvider
 from core.task_executor import TaskExecutor
 
+# Import monitoring components
+from monitoring.callbacks import AlertingCallbackHandler
+from monitoring.tracing import get_callback_handler
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,6 +47,7 @@ class NetworkAgentWorkflow:
         task_executor: TaskExecutor,
         tools: list,
         max_history_tokens: int = 3500,
+        enable_monitoring: bool = True,
     ):
         self._llm_provider = llm_provider
         self._device_inventory = device_inventory
@@ -50,6 +55,11 @@ class NetworkAgentWorkflow:
         self._tools = tools
         self._max_history_tokens = max_history_tokens
         self._graph = None
+        self._enable_monitoring = enable_monitoring
+        self._monitoring_handler = None
+
+        if self._enable_monitoring:
+            self._monitoring_handler = AlertingCallbackHandler()
 
     def build(self):
         if self._graph is not None:
@@ -114,10 +124,34 @@ class NetworkAgentWorkflow:
         logger.info("Initializing in-memory persistence")
         checkpointer = MemorySaver()
 
-        # Compile without store (not needed with partial binding)
-        self._graph = workflow.compile(checkpointer=checkpointer)
+        # Compile with monitoring if enabled
+        if self._enable_monitoring and self._monitoring_handler:
+            # For now, we'll compile without the handler but can be extended to use it
+            self._graph = workflow.compile(checkpointer=checkpointer)
+        else:
+            self._graph = workflow.compile(checkpointer=checkpointer)
 
         return self._graph
+
+    def get_monitoring_handler(self):
+        """Get the monitoring callback handler."""
+        return self._monitoring_handler
+
+    def get_session_stats(self, session_id: str = None):
+        """Get monitoring statistics for a session."""
+        if self._monitoring_handler:
+            return self._monitoring_handler.get_session_stats()
+        return None
+
+    def reset_monitoring_session(self):
+        """Reset monitoring for a new session."""
+        if self._monitoring_handler:
+            self._monitoring_handler.reset_session()
+
+    def set_session_id(self, session_id: str):
+        """Set session ID for monitoring."""
+        if self._monitoring_handler:
+            self._monitoring_handler.set_session_id(session_id)
 
     def _route_tool_calls(self, state: State) -> str:
         """Decide next node based on the tool selected by UnderstandingNode."""

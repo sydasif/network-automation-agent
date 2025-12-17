@@ -23,7 +23,7 @@ class AppBootstrapper:
         self._objects["nornir"] = NornirManager(self.config)
         self._objects["inventory"] = DeviceInventory(self._objects["nornir"])
         self._objects["executor"] = TaskExecutor(self._objects["nornir"])
-        self._objects["llm"] = LLMProvider(self.config)
+        self._objects["llm"] = LLMProvider(self.config, enable_monitoring=True)
         # Create tools registry (tools will obtain runtime dependencies via InjectedState)
         self._objects["tools"] = create_tools(self._objects["executor"])
         self._objects["workflow"] = NetworkAgentWorkflow(

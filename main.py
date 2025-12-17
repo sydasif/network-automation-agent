@@ -34,6 +34,12 @@ def main() -> None:
         action="store_true",
         help="Start interactive chat mode (default when no command provided)",
     )
+    parser.add_argument(
+        "--monitor",
+        "-m",
+        action="store_true",
+        help="Show monitoring dashboard and exit",
+    )
 
     args = parser.parse_args()
 
@@ -71,7 +77,10 @@ def main() -> None:
         app = NetworkAgentCLI(config)
 
         # Determine mode based on arguments
-        if args.chat or not args.command:
+        if args.monitor:
+            # Show monitoring dashboard and exit
+            print(app.show_dashboard())
+        elif args.chat or not args.command:
             # Interactive chat mode
             app.run_interactive_chat(device=args.device)
         else:

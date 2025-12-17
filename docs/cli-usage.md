@@ -20,6 +20,7 @@ The Network Automation Agent provides a command-line interface that allows you t
 - `--chat, -c`: Start interactive chat mode (default when no command provided)
 - `--device DEVICE, -d DEVICE`: Target device for the command (recommended)
 - `--debug`: Enable debug logging
+- `--monitor, -m`: Show monitoring dashboard and exit
 - `--help`: Show help message and exit
 
 ### Usage Syntax
@@ -192,6 +193,34 @@ env | grep GROQ
 # Verify inventory files exist
 ls -la hosts.yaml groups.yaml config.yaml
 ```
+
+## Monitoring Dashboard
+
+The Network Automation Agent includes a comprehensive monitoring dashboard that provides real-time insights into system performance, workflow execution, and system health.
+
+### Accessing the Dashboard
+
+To view the monitoring dashboard:
+
+```bash
+uv run python main.py --monitor
+# or
+uv run python main.py -m
+```
+
+The dashboard displays:
+
+- **System Status**: Overall health status and performance score
+- **Performance Metrics**: Average tool execution time, LLM response time, and success rates
+- **Recent Sessions**: List of recent workflow sessions with execution details
+- **Alert Summary**: Count of recent alerts by type and severity
+- **Recent Alerts**: Details of the most recent alerts
+
+### Dashboard Features
+
+- **Performance Indicators**: Color-coded status indicators (✅ Good, ⚠️ Warning, ❌ Critical)
+- **Session Tracking**: Monitor individual workflow sessions with detailed metrics
+- **Alert Management**: View and track system alerts with severity levels
 
 ## Advanced Usage
 

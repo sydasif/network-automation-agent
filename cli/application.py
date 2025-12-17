@@ -1,4 +1,4 @@
-"""CLI application for the Network AI Agent.
+"""CLI application for the Network AI Agent with monitoring integration.
 
 This module provides the NetworkAgentCLI class that manages
 the entire application lifecycle and coordinates all components.
@@ -6,11 +6,15 @@ the entire application lifecycle and coordinates all components.
 
 import logging
 import uuid
-from typing import Any
+from typing import Any, Dict
 
 from cli.bootstrapper import AppBootstrapper
 from cli.orchestrator import WorkflowOrchestrator
 from core import NetworkAgentConfig
+
+# Import monitoring components
+from monitoring.dashboard import get_dashboard
+from monitoring.alerting import get_alert_manager
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +24,7 @@ class NetworkAgentCLI:
 
     This class manages the entire application lifecycle, coordinates
     all components, and provides both single command and interactive
-    chat interfaces.
+    chat interfaces with monitoring.
     """
 
     def __init__(self, config: NetworkAgentConfig):
@@ -36,6 +40,15 @@ class NetworkAgentCLI:
             workflow=self.components["workflow"],
             ui=self.components["ui"],
             config=config,
+        )
+
+        # Initialize monitoring components
+        self.dashboard = get_dashboard()
+        self.alert_manager = get_alert_manager()
+
+        # Add alert handler to dashboard
+        self.alert_manager.add_alert_handler(
+            lambda alert: self.dashboard.add_alert(alert.to_dict())
         )
 
     def run_single_command(
@@ -55,14 +68,26 @@ class NetworkAgentCLI:
         # (Though orchestrator would generate one if we passed None, passing it explicitly is cleaner)
         session_id = str(uuid.uuid4())
 
-        # Use the orchestrator to execute the command
-        result = self.orchestrator.execute_command(command, device, session_id=session_id)
+        try:
+            # Use the orchestrator to execute the command
+            result = self.orchestrator.execute_command(command, device, session_id=session_id)
 
-        # Print output if requested
-        if print_output:
-            self._print_result(result)
+            # Get and add session metrics to dashboard
+            if hasattr(self.orchestrator.workflow, 'get_session_stats'):
+                stats = self.orchestrator.workflow.get_session_stats()
+                if stats:
+                    self.dashboard.add_session_metrics(stats)
 
-        return result
+            # Print output if requested
+            if print_output:
+                self._print_result(result)
+
+            return result
+        except Exception as e:
+            # Trigger failure alert
+            from monitoring.alerting import trigger_workflow_failure_alert
+            trigger_workflow_failure_alert(e, session_id)
+            raise
 
     def run_interactive_chat(self, device: str | None = None) -> None:
         """Run interactive chat mode.
@@ -99,6 +124,12 @@ class NetworkAgentCLI:
                 # CRITICAL: Pass the persistent session_id here!
                 result = self.orchestrator.execute_command(command, device, session_id=session_id)
 
+                # Get and add session metrics to dashboard
+                if hasattr(self.orchestrator.workflow, 'get_session_stats'):
+                    stats = self.orchestrator.workflow.get_session_stats()
+                    if stats:
+                        self.dashboard.add_session_metrics(stats)
+
                 # Print result
                 self._print_result(result)
 
@@ -109,6 +140,10 @@ class NetworkAgentCLI:
                 self.components["ui"].print_session_interruption()
                 break
             except Exception as e:
+                # Trigger failure alert
+                from monitoring.alerting import trigger_workflow_failure_alert
+                trigger_workflow_failure_alert(e, session_id)
+
                 self.components["ui"].print_error(f"Error processing command: {e}")
                 logger.exception("Unexpected error in interactive chat")
 
@@ -162,3 +197,11 @@ class NetworkAgentCLI:
         # logger.info("Cleaning up application resources...") # Removed as per user request
         self.components["nornir"].close()
         # Workflow uses in-memory persistence, no additional cleanup required
+
+    def show_dashboard(self) -> str:
+        """Show the monitoring dashboard."""
+        return self.dashboard.generate_dashboard_report()
+
+    def get_alerts_summary(self) -> Dict[str, Any]:
+        """Get alerts summary."""
+        return self.alert_manager.get_alert_summary()
