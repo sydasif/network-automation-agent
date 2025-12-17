@@ -19,9 +19,13 @@ The workflow is implemented using LangGraph with a deterministic "One-Shot" appr
 
 ## State Management
 
-The system uses a simple state structure defined in `agent/state.py`:
+The system uses an extended state structure defined in `agent/state.py`:
 
 - `State` contains a `messages` field that stores the conversation history
+- `device_status`: Optional[Dict[str, Any]] - for tracking device status
+- `current_session`: Optional[str] - for session management
+- `approval_context`: Optional[Dict[str, Any]] - for approval context
+- `execution_metadata`: Optional[Dict[str, Any]] - for execution metadata
 - Messages flow between nodes and contain both user input and tool results
 - The state uses LangGraph's `add_messages` reducer for automatic message updates
 - Session persistence is handled via in-memory checkpointing
