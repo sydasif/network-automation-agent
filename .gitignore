@@ -13,7 +13,7 @@ wheels/
 .chainlit/
 chainlit.md
 
-net_lab/
+net_lab/*
 !net_lab/topology.yml
 repomix*
 .env

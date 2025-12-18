@@ -1,0 +1,28 @@
+---
+# Multi Site VLAN Topology Configuration
+name: vlan
+provider: clab
+
+defaults:
+  device: eos
+  devices:
+    eos.clab.image: asifsyd/ceos:4.32.0F
+    ioll2.clab.image: asifsyd/cisco_iol:l2-17.12.01
+
+nodes: [r1, s1, s2]
+module: [ospf]
+groups:
+  switch:
+    members: [s1, s2]
+    module: [vlan]
+    device: ioll2
+
+vlans:
+  site_a:
+    links: [s1]
+    id: 100
+  site_b:
+    links: [s2]
+    id: 100
+
+links: [r1-s1, r1-s2]
